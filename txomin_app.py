@@ -10,8 +10,8 @@ from streamlit_folium import st_folium
 # --- 1. CONFIGURACIÓN Y CONSTANTES ---
 st.set_page_config(page_title="Txomin v.27.1 - Mutriku Pro", page_icon="🔱", layout="wide")
 
-# ⚠️ RECUERDA: SUSTITUYE POR TU API KEY REAL DE OPENWEATHER
-API_KEY_WEATHER = 'fc2653f36f4e11a5ce0688ded3dd95f2' 
+# ⚠️ RECUERDA: SUSTITUYE POR TU API KEY REAL DE OPENWEATHER 
+API_KEY_WEATHER = st.secrets["OPENWEATHER_API_KEY"]
 LAT_MUTRIKU, LON_MUTRIKU = 43.315, -2.38
 ARCHIVO_MARCAS = "marcas_exito.csv"
 
