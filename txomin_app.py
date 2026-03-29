@@ -9,7 +9,7 @@ from folium import plugins
 from streamlit_folium import st_folium
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Txomin v.32.2 - Plotter Osoa", page_icon="🔱", layout="wide")
+st.set_page_config(page_title="Txomin v.32.4 - Espezieak eta Plotterra", page_icon="🔱", layout="wide")
 
 API_KEY_WEATHER = st.secrets["OPENWEATHER_API_KEY"]
 LAT_MUTRIKU, LON_MUTRIKU = 43.315, -2.38
@@ -28,9 +28,12 @@ st.markdown(f"""
         .tide-alert {{ background: rgba(5, 150, 105, 0.85); border-radius: 10px; padding: 10px; text-align: center; font-weight: bold; margin-bottom: 25px; border: 1px solid #34D399; }}
         .scroll-wrapper {{ display: flex; overflow-x: auto; gap: 15px; padding: 10px 0; }}
         .hour-card {{ flex: 0 0 auto; width: 175px; background: rgba(255, 255, 255, 0.95); border-left: 5px solid #0369A1; border-radius: 12px; padding: 15px; text-align: center; color: #1E293B !important; }}
-        .hour-card h4 {{ margin: 0; color: #0369A1 !important; font-size: 1.2rem; }}
+        .hour-card h4 {{ margin: 0; color: #0369A1 !important; font-size: 1.2rem; border-bottom: 1px solid #E2E8F0; padding-bottom: 5px; margin-bottom: 5px; }}
         .rec-badge {{ background: #059669; color: white; border-radius: 8px; padding: 4px; margin-top: 10px; font-weight: bold; font-size: 0.8rem; display: block; }}
-        .day-forecast-card {{ background: rgba(255, 255, 255, 0.95); border-radius: 15px; padding: 20px; margin-bottom: 15px; color: #1E293B; border-left: 8px solid #0369A1; }}
+        .day-forecast-card {{ background: rgba(255, 255, 255, 0.95); border-radius: 15px; padding: 20px; margin-bottom: 15px; color: #1E293B; border-left: 8px solid #0369A1; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }}
+        .day-forecast-title {{ font-size: 1.3rem; font-weight: bold; color: #0369A1; margin-bottom: 10px; border-bottom: 2px solid #E2E8F0; padding-bottom: 5px; text-transform: capitalize; }}
+        .day-metrics-row {{ display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 10px; font-size: 1.05rem; }}
+        .day-metrics-row div {{ background: #F1F5F9; padding: 8px 12px; border-radius: 8px; margin: 5px 5px 0 0; border: 1px solid #CBD5E1; display:flex; align-items:center; gap:5px; font-weight: bold; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -44,11 +47,6 @@ def flecha_hacia(grados):
 def generar_marea_aprox(fecha_target):
     dia = fecha_target.day
     return f"{(dia % 12) + 2:02d}:{(dia * 7 % 60):02d}", f"{((dia % 12) + 8) % 24:02d}:{(dia * 7 % 60 + 15) % 60:02d}", 50 + (dia * 3 % 45)
-
-def calcular_proxima_marea():
-    ahora = datetime.now(ZONA_HORARIA)
-    p, b, _ = generar_marea_aprox(ahora)
-    return f"⏳ Hurrengo marea hurbil: Plea {p} / Baja {b}"
 
 def recomendacion_tecnica(ola, viento, corriente):
     if ola > 2.2: return "🛑 PORTUA", "Itsaso zakarregia."
@@ -64,11 +62,10 @@ def fetch_data():
     except: return None, None
 
 # --- 3. INTERFAZ ---
-st.title("🔱 Txomin v.32.2")
+st.title("🔱 Txomin v.32.4")
 dm_m, dw_m = fetch_data()
 ahora_local = datetime.now(ZONA_HORARIA)
 
-# CREACIÓN DE PESTAÑAS (ORDEN CORRECTO)
 tab0, tab1, tab2, tab3 = st.tabs(["⚓ ITSASOA", "📅 4 EGUN", "🗺️ MAPA", "🐟 ESPEZIEAK"])
 
 with tab0:
@@ -87,10 +84,9 @@ with tab0:
         with c3: st.markdown(f"<div class='metric-card'><h3>🌡️ URA</h3><h2>{dm_m['hourly']['sea_surface_temperature'][0]:.1f}°</h2></div>", unsafe_allow_html=True)
         with c4: st.markdown(f"<div class='metric-card'><h3>💧 KORR.</h3><h2>{v_corr:.1f} <span class='big-arrow'>{dir_corr}</span></h2></div>", unsafe_allow_html=True)
         
-        st.markdown(f"<div class='tide-alert'>{calcular_proxima_marea()}</div>", unsafe_allow_html=True)
+        p, b, _ = generar_marea_aprox(ahora_local)
+        st.markdown(f"<div class='tide-alert'>⏳ Hurrengo marea hurbil: Plea {p} / Baja {b}</div>", unsafe_allow_html=True)
         
-        # Carrusel hoy
-        st.write("### GAURKO EBOLUZIOA")
         html_c = "<div class='scroll-wrapper'>"
         for i in range(0, 8):
             item = dw_m['list'][i]
@@ -101,25 +97,42 @@ with tab0:
         st.markdown(html_c + "</div>", unsafe_allow_html=True)
 
 with tab1:
-    st.header("📅 Hurrengo 4 Egunak")
-    hoy = ahora_local.date()
-    for i in range(1, 5):
-        d = hoy + timedelta(days=i)
-        p, b, c = generar_marea_aprox(d)
-        st.markdown(f"<div class='day-forecast-card'><h3>{d.strftime('%A, %b %d')}</h3><p>🔼 Plea: {p} | 🔽 Baja: {b} | 🌊 Koef: {c}</p></div>", unsafe_allow_html=True)
+    st.header("📅 4 Eguneko Iragarpena")
+    if dw_m:
+        hoy = ahora_local.date()
+        for i in range(1, 5):
+            d = hoy + timedelta(days=i)
+            plea, baja, coef = generar_marea_aprox(d)
+            item_12 = next((x for x in dw_m['list'] if datetime.fromtimestamp(x['dt'], ZONA_HORARIA).date() == d and datetime.fromtimestamp(x['dt'], ZONA_HORARIA).hour in [11, 12, 13]), None)
+            if item_12:
+                idx = dw_m['list'].index(item_12)
+                o_p = dm_m['hourly']['wave_height'][idx*3]
+                o_d = flecha_desde(dm_m['hourly']['wave_direction'][idx*3])
+                v_p = item_12['wind']['speed'] * 3.6
+                v_d = flecha_desde(item_12['wind']['deg'])
+                st.markdown(f"<div class='day-forecast-card'><div class='day-forecast-title'>{d.strftime('%A, %b %d')}</div><div class='day-metrics-row'><div>🌬️ {v_p:.1f} <span class='med-arrow'>{v_d}</span></div><div>🌊 {o_p:.1f} <span class='med-arrow'>{o_d}</span></div></div><div class='day-metrics-row' style='background:#E0F2FE;'><div>🔼 Plea: {plea}</div><div>🔽 Baja: {baja}</div><div>🌊 Koef: {coef}</div></div></div>", unsafe_allow_html=True)
 
 with tab2:
-    st.subheader("🗺️ Mutrikuko Plotterra")
+    st.subheader("🗺️ Plotterra")
     m = folium.Map(location=[LAT_MUTRIKU, LON_MUTRIKU], zoom_start=15)
-    folium.TileLayer(tiles='https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attr='Esri', name='Topografikoa').add_to(m)
-    folium.WmsTileLayer(url='https://ideihm.covam.es/wms/cartografia_espanola?', layers='relieve,isobatas', name='IHM Sakonera', fmt='image/png', transparent=True, overlay=True).add_to(m)
-    
-    # HERRAMIENTAS RECUPERADAS
+    folium.TileLayer(tiles='https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attr='Esri').add_to(m)
+    folium.WmsTileLayer(url='https://ideihm.covam.es/wms/cartografia_espanola?', layers='relieve,isobatas', name='IHM', fmt='image/png', transparent=True, overlay=True).add_to(m)
     plugins.MeasureControl(position='topright', primary_length_unit='meters').add_to(m)
     plugins.Draw(position='topleft', draw_options={'polyline':{'shapeOptions':{'color':'#FBBF24'}}}).add_to(m)
-    
-    st_folium(m, width="100%", height=600, key="plotter_final")
+    st_folium(m, width="100%", height=600, key="plotter_v324")
 
 with tab3:
-    st.header("🐟 Arrainak")
-    st.write("1. **SARGOA**: Aparretan. 2. **LUPINA**: Spinning. 3. **TXIPIROIA**: Poterak.")
+    st.header("🐟 Kantauriko 10 Espezie Nagusiak")
+    c_e1, c_e2 = st.columns(2)
+    with c_e1:
+        with st.expander("1. SARGOA"): st.write("**Aholkua:** Aparraren erregea. Itsasoa: 0.8m-1.5m. Kortxoa edo hondoa. Beita: Izkira edo masia.")
+        with st.expander("2. LUPINA"): st.write("**Aholkua:** Aparretan. Egunsentian edo ilunabarrean. Spinning minnow-ekin edo bizirik.")
+        with st.expander("3. TXITXARROA"): st.write("**Aholkua:** Kakea arina 3 korapilotara luma zuriekin itsasoa kizkurtzean.")
+        with st.expander("4. TXIPIROIA"): st.write("**Aholkua:** Ur geldoak eta ilunabarra. 2.0-ko poterak tirakada leunekin.")
+        with st.expander("5. URRABURUA (Dorada)"): st.write("**Aholkua:** Hondarrezko hondo mistoa. Beita gogorra (karramarroa, navaja).")
+    with c_e2:
+        with st.expander("6. DENTOIA"): st.write("**Aholkua:** Hondo handiak. Jigging astuna edo beita bizia (txibia/kalamarra).")
+        with st.expander("7. MOXARRA"): st.write("**Aholkua:** Ur lasaiagoak. Hondoa edo kortxoa arroketatik gertu.")
+        with st.expander("8. SALMONETEA"): st.write("**Aholkua:** Hondarrezko hondoak. Amu finak zizarearekin (koreana).")
+        with st.expander("9. KABRARROKA"): st.write("**Aholkua:** Harri purua. Hondo astuna txipiroi tirekin. Kontuz arantzekin!")
+        with st.expander("10. BOGA"): st.write("**Aholkua:** Ur erdiak. Kortxo arina. Dibertigarria umeentzat.")
