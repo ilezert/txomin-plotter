@@ -9,7 +9,7 @@ from folium import plugins
 from streamlit_folium import st_folium
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Txomin v.32.4 - Espezieak eta Plotterra", page_icon="🔱", layout="wide")
+st.set_page_config(page_title="Txomin v.32.5 - Semaforoa", page_icon="🔱", layout="wide")
 
 API_KEY_WEATHER = st.secrets["OPENWEATHER_API_KEY"]
 LAT_MUTRIKU, LON_MUTRIKU = 43.315, -2.38
@@ -26,18 +26,26 @@ st.markdown(f"""
         .big-arrow {{ font-size: 2.2rem; font-weight: bold; color: #FBBF24; }}
         .med-arrow {{ font-size: 1.2rem; font-weight: bold; color: #0369A1; }}
         .tide-alert {{ background: rgba(5, 150, 105, 0.85); border-radius: 10px; padding: 10px; text-align: center; font-weight: bold; margin-bottom: 25px; border: 1px solid #34D399; }}
+        
+        /* Semáforo y Tarjetas de Previsión */
+        .day-forecast-card {{ background: rgba(255, 255, 255, 0.98); border-radius: 15px; padding: 0; margin-bottom: 20px; color: #1E293B; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }}
+        .status-bar {{ height: 12px; width: 100%; }}
+        .bg-green {{ background-color: #10B981; }}
+        .bg-yellow {{ background-color: #FBBF24; }}
+        .bg-red {{ background-color: #EF4444; }}
+        .card-content {{ padding: 20px; }}
+        .day-forecast-title {{ font-size: 1.4rem; font-weight: bold; color: #0369A1; margin-bottom: 10px; text-transform: capitalize; border-bottom: 1px solid #E2E8F0; padding-bottom: 5px; }}
+        
+        .activity-badge {{ background: #1E293B; color: #FBBF24; padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; display: inline-block; margin-bottom: 10px; }}
+        .day-metrics-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }}
+        .metric-item {{ background: #F1F5F9; padding: 10px; border-radius: 8px; border: 1px solid #CBD5E1; text-align: center; font-size: 0.9rem; font-weight: bold; color: #334155; }}
+        
         .scroll-wrapper {{ display: flex; overflow-x: auto; gap: 15px; padding: 10px 0; }}
         .hour-card {{ flex: 0 0 auto; width: 175px; background: rgba(255, 255, 255, 0.95); border-left: 5px solid #0369A1; border-radius: 12px; padding: 15px; text-align: center; color: #1E293B !important; }}
-        .hour-card h4 {{ margin: 0; color: #0369A1 !important; font-size: 1.2rem; border-bottom: 1px solid #E2E8F0; padding-bottom: 5px; margin-bottom: 5px; }}
-        .rec-badge {{ background: #059669; color: white; border-radius: 8px; padding: 4px; margin-top: 10px; font-weight: bold; font-size: 0.8rem; display: block; }}
-        .day-forecast-card {{ background: rgba(255, 255, 255, 0.95); border-radius: 15px; padding: 20px; margin-bottom: 15px; color: #1E293B; border-left: 8px solid #0369A1; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }}
-        .day-forecast-title {{ font-size: 1.3rem; font-weight: bold; color: #0369A1; margin-bottom: 10px; border-bottom: 2px solid #E2E8F0; padding-bottom: 5px; text-transform: capitalize; }}
-        .day-metrics-row {{ display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 10px; font-size: 1.05rem; }}
-        .day-metrics-row div {{ background: #F1F5F9; padding: 8px 12px; border-radius: 8px; margin: 5px 5px 0 0; border: 1px solid #CBD5E1; display:flex; align-items:center; gap:5px; font-weight: bold; }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. LÓGICA ---
+# --- 2. LÓGICA TÁCTICA ---
 def flecha_desde(grados):
     return ["↓", "↙", "←", "↖", "↑", "↗", "→", "↘"][round(grados / 45) % 8]
 
@@ -48,10 +56,19 @@ def generar_marea_aprox(fecha_target):
     dia = fecha_target.day
     return f"{(dia % 12) + 2:02d}:{(dia * 7 % 60):02d}", f"{((dia % 12) + 8) % 24:02d}:{(dia * 7 % 60 + 15) % 60:02d}", 50 + (dia * 3 % 45)
 
-def recomendacion_tecnica(ola, viento, corriente):
-    if ola > 2.2: return "🛑 PORTUA", "Itsaso zakarregia."
-    if 0.8 <= ola <= 1.8: return "🎣 KORTXOA", "Aparretan arrantza."
-    return "⚓ JIGGING", "Ur lasaia hondoan."
+def get_semaforo_color(ola, viento):
+    if ola > 2.0 or viento > 25: return "bg-red", "🛑 ARRISKUTSUA / PELIGRO"
+    if viento > 10 or ola > 1.5: return "bg-yellow", "🟡 KONTUZ / PRECAUCIÓN"
+    return "bg-green", "🟢 EGOKIA / IDEAL"
+
+def calcular_actividad(ola, viento, coef, temp, pres):
+    puntos = 1
+    if 60 <= coef <= 95: puntos += 1
+    if 1010 <= pres <= 1025: puntos += 1
+    if 13 <= temp <= 19: puntos += 1
+    if 0.5 <= ola <= 1.5: puntos += 1
+    if viento > 25: puntos -= 1
+    return max(1, min(5, puntos))
 
 @st.cache_data(ttl=600)
 def fetch_data():
@@ -62,7 +79,7 @@ def fetch_data():
     except: return None, None
 
 # --- 3. INTERFAZ ---
-st.title("🔱 Txomin v.32.4")
+st.title("🔱 Txomin v.32.5 - Semaforoa")
 dm_m, dw_m = fetch_data()
 ahora_local = datetime.now(ZONA_HORARIA)
 
@@ -76,41 +93,62 @@ with tab0:
         dir_corr = flecha_hacia(dm_m['hourly']['ocean_current_direction'][0])
         v_viento = dw_m['list'][0]['wind']['speed'] * 3.6
         dir_viento = flecha_desde(dw_m['list'][0]['wind']['deg'])
+        temp_u = dm_m['hourly']['sea_surface_temperature'][0]
+        pres_a = dw_m['list'][0]['main']['pressure']
         
         st.markdown(f"<div class='main-card'><h1>MUTRIKU {ahora_local.strftime('%H:%M')}</h1></div>", unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
         with c1: st.markdown(f"<div class='metric-card'><h3>🌬️ HAIZEA</h3><h2>{v_viento:.1f} <span class='big-arrow'>{dir_viento}</span></h2></div>", unsafe_allow_html=True)
         with c2: st.markdown(f"<div class='metric-card'><h3>🌊 OLA</h3><h2>{ola_act:.1f} <span class='big-arrow'>{ola_dir}</span></h2></div>", unsafe_allow_html=True)
-        with c3: st.markdown(f"<div class='metric-card'><h3>🌡️ URA</h3><h2>{dm_m['hourly']['sea_surface_temperature'][0]:.1f}°</h2></div>", unsafe_allow_html=True)
+        with c3: st.markdown(f"<div class='metric-card'><h3>🌡️ URA</h3><h2>{temp_u:.1f}°</h2><p>{pres_a} hPa</p></div>", unsafe_allow_html=True)
         with c4: st.markdown(f"<div class='metric-card'><h3>💧 KORR.</h3><h2>{v_corr:.1f} <span class='big-arrow'>{dir_corr}</span></h2></div>", unsafe_allow_html=True)
         
         p, b, _ = generar_marea_aprox(ahora_local)
         st.markdown(f"<div class='tide-alert'>⏳ Hurrengo marea hurbil: Plea {p} / Baja {b}</div>", unsafe_allow_html=True)
-        
-        html_c = "<div class='scroll-wrapper'>"
-        for i in range(0, 8):
-            item = dw_m['list'][i]
-            h = datetime.fromtimestamp(item['dt'], ZONA_HORARIA)
-            o = dm_m['hourly']['wave_height'][i*3]
-            tec, _ = recomendacion_tecnica(o, 0, 0)
-            html_c += f"<div class='hour-card'><h4>{h.strftime('%H:%M')}</h4><p>🌬️ {item['wind']['speed']*3.6:.0f} <span class='med-arrow'>{flecha_desde(item['wind']['deg'])}</span></p><p>🌊 {o:.1f} <span class='med-arrow'>{flecha_desde(dm_m['hourly']['wave_direction'][i*3])}</span></p><span class='rec-badge'>{tec}</span></div>"
-        st.markdown(html_c + "</div>", unsafe_allow_html=True)
 
 with tab1:
-    st.header("📅 4 Eguneko Iragarpena")
-    if dw_m:
+    st.header("📅 Hurrengo 4 Eguneko Iragarpen Taktikoa")
+    if dw_m and dm_m:
         hoy = ahora_local.date()
         for i in range(1, 5):
             d = hoy + timedelta(days=i)
             plea, baja, coef = generar_marea_aprox(d)
-            item_12 = next((x for x in dw_m['list'] if datetime.fromtimestamp(x['dt'], ZONA_HORARIA).date() == d and datetime.fromtimestamp(x['dt'], ZONA_HORARIA).hour in [11, 12, 13]), None)
-            if item_12:
-                idx = dw_m['list'].index(item_12)
-                o_p = dm_m['hourly']['wave_height'][idx*3]
-                o_d = flecha_desde(dm_m['hourly']['wave_direction'][idx*3])
-                v_p = item_12['wind']['speed'] * 3.6
-                v_d = flecha_desde(item_12['wind']['deg'])
-                st.markdown(f"<div class='day-forecast-card'><div class='day-forecast-title'>{d.strftime('%A, %b %d')}</div><div class='day-metrics-row'><div>🌬️ {v_p:.1f} <span class='med-arrow'>{v_d}</span></div><div>🌊 {o_p:.1f} <span class='med-arrow'>{o_d}</span></div></div><div class='day-metrics-row' style='background:#E0F2FE;'><div>🔼 Plea: {plea}</div><div>🔽 Baja: {baja}</div><div>🌊 Koef: {coef}</div></div></div>", unsafe_allow_html=True)
+            item_12 = next((x for x in dw_m['list'] if datetime.fromtimestamp(x['dt'], ZONA_HORARIA).date() == d and datetime.fromtimestamp(x['dt'], ZONA_HORARIA).hour in [11, 12, 13]), dw_m['list'][i*8])
+            
+            idx = dw_m['list'].index(item_12)
+            o_p = dm_m['hourly']['wave_height'][idx*3]
+            o_d = flecha_desde(dm_m['hourly']['wave_direction'][idx*3])
+            v_p = item_12['wind']['speed'] * 3.6
+            v_d = flecha_desde(item_12['wind']['deg'])
+            c_v = dm_m['hourly']['ocean_current_velocity'][idx*3] * 3.6
+            c_d = flecha_hacia(dm_m['hourly']['ocean_current_direction'][idx*3])
+            t_u = dm_m['hourly']['sea_surface_temperature'][idx*3]
+            p_a = item_12['main']['pressure']
+            
+            color_class, status_text = get_semaforo_color(o_p, v_p)
+            act_score = calcular_actividad(o_p, v_p, coef, t_u, p_a)
+            estrellas = "⭐" * act_score + "🌑" * (5 - act_score)
+            
+            st.markdown(f"""
+            <div class='day-forecast-card'>
+                <div class='status-bar {color_class}'></div>
+                <div class='card-content'>
+                    <div style='display:flex; justify-content:space-between; align-items:center;'>
+                        <div class='day-forecast-title'>{d.strftime('%A, %b %d')}</div>
+                        <div style='font-weight:bold; color:#334155;'>{status_text}</div>
+                    </div>
+                    <div class='activity-badge'>Arrainen Jarduera / Actividad: {estrellas}</div>
+                    <div class='day-metrics-grid'>
+                        <div class='metric-item'>🌬️ Haizea<br>{v_p:.1f} km/h {v_d}</div>
+                        <div class='metric-item'>🌊 Olatua<br>{o_p:.1f} m {o_d}</div>
+                        <div class='metric-item'>💧 Korrontea<br>{c_v:.1f} km/h {c_d}</div>
+                        <div class='metric-item'>🌡️ Ura/Presioa<br>{t_u:.1f}° / {p_a}hPa</div>
+                        <div class='metric-item' style='background:#E0F2FE;'>🔼 Plea: {plea}<br>🔽 Baja: {baja}</div>
+                        <div class='metric-item' style='background:#E0F2FE;'>🌊 Koef: {coef}</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 with tab2:
     st.subheader("🗺️ Plotterra")
@@ -119,20 +157,8 @@ with tab2:
     folium.WmsTileLayer(url='https://ideihm.covam.es/wms/cartografia_espanola?', layers='relieve,isobatas', name='IHM', fmt='image/png', transparent=True, overlay=True).add_to(m)
     plugins.MeasureControl(position='topright', primary_length_unit='meters').add_to(m)
     plugins.Draw(position='topleft', draw_options={'polyline':{'shapeOptions':{'color':'#FBBF24'}}}).add_to(m)
-    st_folium(m, width="100%", height=600, key="plotter_v324")
+    st_folium(m, width="100%", height=600, key="plotter_v325")
 
 with tab3:
-    st.header("🐟 Kantauriko 10 Espezie Nagusiak")
-    c_e1, c_e2 = st.columns(2)
-    with c_e1:
-        with st.expander("1. SARGOA"): st.write("**Aholkua:** Aparraren erregea. Itsasoa: 0.8m-1.5m. Kortxoa edo hondoa. Beita: Izkira edo masia.")
-        with st.expander("2. LUPINA"): st.write("**Aholkua:** Aparretan. Egunsentian edo ilunabarrean. Spinning minnow-ekin edo bizirik.")
-        with st.expander("3. TXITXARROA"): st.write("**Aholkua:** Kakea arina 3 korapilotara luma zuriekin itsasoa kizkurtzean.")
-        with st.expander("4. TXIPIROIA"): st.write("**Aholkua:** Ur geldoak eta ilunabarra. 2.0-ko poterak tirakada leunekin.")
-        with st.expander("5. URRABURUA (Dorada)"): st.write("**Aholkua:** Hondarrezko hondo mistoa. Beita gogorra (karramarroa, navaja).")
-    with c_e2:
-        with st.expander("6. DENTOIA"): st.write("**Aholkua:** Hondo handiak. Jigging astuna edo beita bizia (txibia/kalamarra).")
-        with st.expander("7. MOXARRA"): st.write("**Aholkua:** Ur lasaiagoak. Hondoa edo kortxoa arroketatik gertu.")
-        with st.expander("8. SALMONETEA"): st.write("**Aholkua:** Hondarrezko hondoak. Amu finak zizarearekin (koreana).")
-        with st.expander("9. KABRARROKA"): st.write("**Aholkua:** Harri purua. Hondo astuna txipiroi tirekin. Kontuz arantzekin!")
-        with st.expander("10. BOGA"): st.write("**Aholkua:** Ur erdiak. Kortxo arina. Dibertigarria umeentzat.")
+    st.header("🐟 Espezieak")
+    st.write("1. **SARGOA**: Aparretan. 2. **LUPINA**: Spinning. 3. **TXIPIROIA**: Poterak.")
