@@ -9,7 +9,7 @@ from folium import plugins
 from streamlit_folium import st_folium
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Txomin v.32.7 - Evoluzio Osoa", page_icon="🔱", layout="wide")
+st.set_page_config(page_title="Txomin v.32.8 - Master Pantaila", page_icon="🔱", layout="wide")
 
 API_KEY_WEATHER = st.secrets["OPENWEATHER_API_KEY"]
 LAT_MUTRIKU, LON_MUTRIKU = 43.315, -2.38
@@ -32,20 +32,21 @@ st.markdown(f"""
         .bg-yellow {{ background-color: #FBBF24; }}
         .bg-red {{ background-color: #EF4444; }}
         
-        .activity-badge {{ background: #1E293B; color: #FBBF24; padding: 8px 15px; border-radius: 25px; font-weight: bold; font-size: 1rem; display: inline-block; margin: 15px 0; border: 1px solid #FBBF24; }}
+        .activity-badge {{ background: #1E293B; color: #FBBF24; padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; display: inline-block; margin: 10px 0; border: 1px solid #FBBF24; }}
         
-        /* CARRUSEL PRO */
-        .scroll-wrapper {{ display: flex; overflow-x: auto; gap: 12px; padding: 10px 0 20px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }}
+        /* CARRUSEL HORIZONTAL FIX */
+        .scroll-wrapper {{ display: flex !important; flex-direction: row !important; overflow-x: auto !important; gap: 12px; padding: 10px 0 20px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; width: 100%; }}
         .scroll-wrapper::-webkit-scrollbar {{ height: 6px; }}
-        .scroll-wrapper::-webkit-scrollbar-thumb {{ background: rgba(255,255,255,0.3); border-radius: 10px; }}
+        .scroll-wrapper::-webkit-scrollbar-thumb {{ background: rgba(0,0,0,0.2); border-radius: 10px; }}
         
-        .hour-card {{ flex: 0 0 auto; width: 160px; background: rgba(255, 255, 255, 0.95); border-top: 4px solid #0369A1; border-radius: 12px; padding: 12px; text-align: center; color: #1E293B !important; scroll-snap-align: start; box-shadow: 2px 2px 8px rgba(0,0,0,0.2); }}
-        .hour-card h4 {{ margin: 0 0 8px 0; color: #0369A1 !important; font-size: 1.1rem; font-weight: 800; border-bottom: 1px solid #E2E8F0; }}
-        .hour-card p {{ margin: 4px 0; font-size: 0.85rem; font-weight: 600; color: #334155 !important; display: flex; justify-content: space-between; }}
+        .hour-card {{ flex: 0 0 auto; width: 150px; background: rgba(255, 255, 255, 0.95); border-top: 4px solid #0369A1; border-radius: 12px; padding: 10px; text-align: center; color: #1E293B !important; scroll-snap-align: start; box-shadow: 2px 2px 8px rgba(0,0,0,0.1); }}
+        .hour-card h4 {{ margin: 0 0 5px 0; color: #0369A1 !important; font-size: 1rem; font-weight: 800; border-bottom: 1px solid #E2E8F0; }}
+        .hour-card p {{ margin: 3px 0; font-size: 0.8rem; font-weight: 600; color: #334155 !important; display: flex; justify-content: space-between; }}
+        .rec-badge {{ background: #059669; color: white; border-radius: 6px; padding: 3px; margin-top: 5px; font-weight: bold; font-size: 0.75rem; display: block; }}
         
-        .day-forecast-card {{ background: rgba(255, 255, 255, 0.98); border-radius: 15px; padding: 0; margin-bottom: 25px; color: #1E293B; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }}
-        .card-content {{ padding: 15px; }}
-        .day-forecast-title {{ font-size: 1.3rem; font-weight: bold; color: #0369A1; text-transform: capitalize; }}
+        .day-forecast-card {{ background: rgba(255, 255, 255, 0.98); border-radius: 15px; padding: 0; margin-bottom: 30px; color: #1E293B; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 1px solid #E2E8F0; }}
+        .card-content {{ padding: 20px; }}
+        .day-forecast-title {{ font-size: 1.4rem; font-weight: bold; color: #0369A1; text-transform: capitalize; margin: 0; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -61,9 +62,9 @@ def generar_marea_aprox(fecha_target):
     return f"{(dia % 12) + 2:02d}:{(dia * 7 % 60):02d}", f"{((dia % 12) + 8) % 24:02d}:{(dia * 7 % 60 + 15) % 60:02d}", 50 + (dia * 3 % 45)
 
 def get_semaforo_info(ola, viento):
-    if ola > 2.0 or viento > 25: return "bg-red", "🛑 ARRISKUTSUA / PELIGRO"
-    if viento > 10 or ola > 1.5: return "bg-yellow", "🟡 KONTUZ / PRECAUCIÓN"
-    return "bg-green", "🟢 EGOKIA / IDEAL"
+    if ola > 2.0 or viento > 25: return "bg-red", "🛑 ARRISKUTSUA"
+    if viento > 10 or ola > 1.5: return "bg-yellow", "🟡 KONTUZ"
+    return "bg-green", "🟢 EGOKIA"
 
 def calcular_actividad(ola, viento, coef, temp, pres):
     puntos = 1
@@ -90,11 +91,11 @@ def fetch_data():
     except: return None, None
 
 # --- 3. INTERFAZ ---
-st.title("🔱 Txomin v.32.7 - Arrantza Maisua")
+st.title("🔱 Txomin v.32.8")
 dm_m, dw_m = fetch_data()
 ahora_local = datetime.now(ZONA_HORARIA)
 
-tab0, tab1, tab2, tab3 = st.tabs(["⚓ ITSASOA ORAIN", "📅 4 EGUNEKO IRAGARPENA", "🗺️ MAPA", "🐟 ESPEZIEAK"])
+tab0, tab1, tab2, tab3 = st.tabs(["⚓ ORAIN", "📅 4 EGUN", "🗺️ MAPA", "🐟 ESPEZIEAK"])
 
 if dm_m and dw_m:
     # --- TAB 0: PORTADA ---
@@ -105,127 +106,80 @@ if dm_m and dw_m:
         pres_a = dw_m['list'][0]['main']['pressure']
         _, _, coef_act = generar_marea_aprox(ahora_local)
         
-        color_cls, status_txt = get_semaforo_info(ola_act, v_viento)
-        estrellas_act = calcular_actividad(ola_act, v_viento, coef_act, temp_u, pres_a)
+        c_cls, s_txt = get_semaforo_info(ola_act, v_viento)
+        estrellas = calcular_actividad(ola_act, v_viento, coef_act, temp_u, pres_a)
 
-        st.markdown(f"""
-            <div class='main-card'>
-                <div class='status-bar {color_cls}'></div>
-                <h1 style='margin-top:10px;'>MUTRIKU {ahora_local.strftime('%H:%M')}</h1>
-                <div style='font-weight:bold; font-size:1.1rem; color:#FBBF24;'>{status_txt}</div>
-                <div class='activity-badge'>Arrainen Jarduera: {estrellas_act}</div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div class='main-card'><div class='status-bar {c_cls}'></div><h1 style='margin-top:10px;'>MUTRIKU {ahora_local.strftime('%H:%M')}</h1><div style='font-weight:bold; color:#FBBF24;'>{s_txt}</div><div class='activity-badge'>Jarduera: {estrellas}</div></div>", unsafe_allow_html=True)
         
         c1, c2, c3, c4 = st.columns(4)
         with c1: st.markdown(f"<div class='metric-card'><h3>🌬️ HAIZEA</h3><h2>{v_viento:.1f} <span class='big-arrow'>{flecha_desde(dw_m['list'][0]['wind']['deg'])}</span></h2></div>", unsafe_allow_html=True)
-        with c2: st.markdown(f"<div class='metric-card'><h3>🌊 OLATUA</h3><h2>{ola_act:.1f} <span class='big-arrow'>{flecha_desde(dm_m['hourly']['wave_direction'][0])}</span></h2></div>", unsafe_allow_html=True)
+        with c2: st.markdown(f"<div class='metric-card'><h3>🌊 OLA</h3><h2>{ola_act:.1f} <span class='big-arrow'>{flecha_desde(dm_m['hourly']['wave_direction'][0])}</span></h2></div>", unsafe_allow_html=True)
         with c3: st.markdown(f"<div class='metric-card'><h3>🌡️ URA</h3><h2>{temp_u:.1f}°</h2><p>{pres_a} hPa</p></div>", unsafe_allow_html=True)
         with c4: st.markdown(f"<div class='metric-card'><h3>💧 KORR.</h3><h2>{dm_m['hourly']['ocean_current_velocity'][0]*3.6:.1f} <span class='big-arrow'>{flecha_hacia(dm_m['hourly']['ocean_current_direction'][0])}</span></h2></div>", unsafe_allow_html=True)
         
-        st.write("### ⏱️ GAURKO EBOLUZIOA (2 ORDURO)")
+        st.write("### ⏱️ GAURKO EBOLUZIOA")
         html_c = "<div class='scroll-wrapper'>"
-        for i in range(0, 12, 2): # Cada 2 horas hoy
-            item_w = dw_m['list'][i//3 * 3 if i < len(dw_m['list']) else 0]
-            h = ahora_local.replace(hour=(ahora_local.hour + i)%24, minute=0)
-            o = dm_m['hourly']['wave_height'][i]
-            v = item_w['wind']['speed'] * 3.6
-            c = dm_m['hourly']['ocean_current_velocity'][i] * 3.6
-            tec = recomendacion_tecnica(o, v)
-            html_c += f"<div class='hour-card'><h4>{h.strftime('%H:%M')}</h4><p>🌬️ {v:.0f} km/h <span>{flecha_desde(item_w['wind']['deg'])}</span></p><p>🌊 {o:.1f} m <span>{flecha_desde(dm_m['hourly']['wave_direction'][i])}</span></p><p>💧 {c:.1f} km/h <span>{flecha_hacia(dm_m['hourly']['ocean_current_direction'][i])}</span></p><span class='rec-badge'>{tec}</span></div>"
+        for i in range(0, 12, 2):
+            idx = i
+            o = dm_m['hourly']['wave_height'][idx]
+            v = dw_m['list'][idx//3]['wind']['speed']*3.6
+            c = dm_m['hourly']['ocean_current_velocity'][idx]*3.6
+            html_c += f"<div class='hour-card'><h4>{(ahora_local.hour+i)%24:02d}:00</h4><p>🌬️ {v:.0f} <span>{flecha_desde(dw_m['list'][idx//3]['wind']['deg'])}</span></p><p>🌊 {o:.1f} <span>{flecha_desde(dm_m['hourly']['wave_direction'][idx])}</span></p><p>💧 {c:.1f} <span>{flecha_hacia(dm_m['hourly']['ocean_current_direction'][idx])}</span></p><span class='rec-badge'>{recomendacion_tecnica(o,v)}</span></div>"
         st.markdown(html_c + "</div>", unsafe_allow_html=True)
 
-    # --- TAB 1: 4 EGUN ---
+    # --- TAB 1: 4 EGUN (FIXED HORIZONTAL & SEMAPHORE) ---
     with tab1:
-        st.header("📅 4 Eguneko Iragarpen Taktikoa (2 orduro)")
+        st.header("📅 4 Eguneko Iragarpena")
         hoy = ahora_local.date()
         for i in range(1, 5):
             d = hoy + timedelta(days=i)
-            plea, baja, coef = generar_marea_aprox(d)
-            st.markdown(f"""
-            <div class='day-forecast-card'>
-                <div class='card-content'>
-                    <div style='display:flex; justify-content:space-between; align-items:center;'>
-                        <div class='day-forecast-title'>{d.strftime('%A, %b %d')}</div>
-                        <div style='font-size:0.9rem; font-weight:bold; color:#0369A1;'>🔼 {plea} | 🔽 {baja} (K:{coef})</div>
-                    </div>
-                    <div class='scroll-wrapper'>
-            """, unsafe_allow_html=True)
+            p, b, coef = generar_marea_aprox(d)
             
-            html_day = ""
-            # Horas de pesca: 08:00 a 22:00 cada 2 horas
-            for h_p in range(8, 23, 2):
+            # Datos mediodía para el semáforo diario
+            idx_12 = (i * 24) + 12
+            o_d = dm_m['hourly']['wave_height'][idx_12]
+            v_d = dw_m['list'][(idx_12//3)%len(dw_m['list'])]['wind']['speed']*3.6
+            c_cls, s_txt = get_semaforo_info(o_d, v_d)
+            estrellas = calcular_actividad(o_d, v_d, coef, dm_m['hourly']['sea_surface_temperature'][idx_12], 1015)
+
+            # HTML CARD
+            html_day = f"<div class='day-forecast-card'><div class='status-bar {c_cls}'></div><div class='card-content'>"
+            html_day += f"<div style='display:flex; justify-content:space-between; align-items:center;'><h3 class='day-forecast-title'>{d.strftime('%A, %b %d')}</h3><b style='color:#334155;'>{s_txt}</b></div>"
+            html_day += f"<div class='activity-badge'>Jarduera: {estrellas}</div>"
+            html_day += f"<p style='margin:0; font-weight:bold; color:#0369A1;'>🔼 {p} | 🔽 {b} | Coef: {coef}</p>"
+            
+            # Carrusel Horizontal
+            html_day += "<div class='scroll-wrapper'>"
+            for h_p in range(8, 23, 3):
                 idx = (i * 24) + h_p
                 if idx < len(dm_m['hourly']['wave_height']):
-                    o_p = dm_m['hourly']['wave_height'][idx]
-                    o_d = flecha_desde(dm_m['hourly']['wave_direction'][idx])
-                    c_v = dm_m['hourly']['ocean_current_velocity'][idx] * 3.6
-                    c_d = flecha_hacia(dm_m['hourly']['ocean_current_direction'][idx])
-                    # Viento aproximado del forecast (cada 3h)
-                    item_w = dw_m['list'][(idx//3) % len(dw_m['list'])]
-                    v_p = item_w['wind']['speed'] * 3.6
-                    v_d = flecha_desde(item_w['wind']['deg'])
-                    tec = recomendacion_tecnica(o_p, v_p)
-                    
-                    html_day += f"<div class='hour-card'><h4>{h_p:02d}:00</h4><p>🌬️ {v_p:.0f} <span>{v_d}</span></p><p>🌊 {o_p:.1f} <span>{o_d}</span></p><p>💧 {c_v:.1f} <span>{c_d}</span></p><span class='rec-badge'>{tec}</span></div>"
-            
-            st.markdown(html_day + "</div></div></div>", unsafe_allow_html=True)
+                    o = dm_m['hourly']['wave_height'][idx]
+                    v = dw_m['list'][(idx//3)%len(dw_m['list'])]['wind']['speed']*3.6
+                    cur = dm_m['hourly']['ocean_current_velocity'][idx]*3.6
+                    html_day += f"<div class='hour-card'><h4>{h_p:02d}:00</h4><p>🌬️ {v:.0f} <span>{flecha_desde(dw_m['list'][(idx//3)%len(dw_m['list'])]['wind']['deg'])}</span></p><p>🌊 {o:.1f} <span>{flecha_desde(dm_m['hourly']['wave_direction'][idx])}</span></p><p>💧 {cur:.1f} <span>{flecha_hacia(dm_m['hourly']['ocean_current_direction'][idx])}</span></p><span class='rec-badge'>{recomendacion_tecnica(o,v)}</span></div>"
+            html_day += "</div></div></div>"
+            st.markdown(html_day, unsafe_allow_html=True)
 
-    # --- TAB 2: MAPA ---
     with tab2:
         m = folium.Map(location=[LAT_MUTRIKU, LON_MUTRIKU], zoom_start=15)
         folium.TileLayer(tiles='https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attr='Esri').add_to(m)
         folium.WmsTileLayer(url='https://ideihm.covam.es/wms/cartografia_espanola?', layers='relieve,isobatas', name='IHM', fmt='image/png', transparent=True, overlay=True).add_to(m)
         plugins.MeasureControl(position='topright').add_to(m)
         plugins.Draw(position='topleft').add_to(m)
-        st_folium(m, width="100%", height=500, key="plotter_v327")
+        st_folium(m, width="100%", height=500, key="plot_v328")
 
-    # --- TAB 3: ESPECIES ---
     with tab3:
         st.header("🐟 Kantauriko 10 Espezie Nagusiak")
         e1, e2 = st.columns(2)
         with e1:
-            with st.expander("📌 1. SARGOA (Diplodus sargus)"):
-                st.write("""Aparraren erregea da. Olatuek arroketan jotzen duten lekuetan ibiltzen da jaten, apar zuri asko dagoen lekuetan. 
-                Gomendioa: Itsasoa 0.8m eta 1.5m artean dagoenean da onena. Erabili korchoa edo hondoa izkira edo masia erabiliz. 
-                Ezinbestekoa da inguruak ondo ezagutzea olatuek ez harrapatzeko.""")
-            with st.expander("🐠 2. LUPINA (Dicentrarchus labrax)"):
-                st.write("""Oso arrain argia eta mesfidatia. Aparretan eta erreka-ahoetan ehizatzen du, ur oxigenatuaren bila. 
-                Gomendioa: Spinning egiteko ezin hobea da egunsentian edo ilunabarrean, itsasoa mugitua dagoenean. 
-                Señuelo artifizialak (minnow) mugimendu azkarrekin erabili.""")
-            with st.expander("🐟 3. TXITXARROA (Trachurus trachurus)"):
-                st.write("""Talde handietan ibiltzen den arraina. Gauez portuko argien inguruan asko hurbiltzen da janari bila. 
-                Gomendioa: Kakea arina egiteko aproposa 3 korapilotara, luma zuriak erabiliz. 
-                Haizeak itsasoa apur bat kizkurtzen duenean aktibatzen dira gehien.""")
-            with st.expander("🦑 4. TXIPIROIA (Loligo vulgaris)"):
-                st.write("""Ur geldoak eta garbiak maite ditu. Itsasbehera denean eta ilunabarrean hasten da mugimendua. 
-                Gomendioa: 2.0 edo 2.5 neurriko poterak erabili, tirakada oso leunak emanez. 
-                Kolore naturalak erabili ur garbiarekin eta deigarriagoak ur zikinarekin.""")
-            with st.expander("👑 5. URRABURUA (Sparus aurata)"):
-                st.write("""Hondarrezko hondo mistoetan eta arroka inguruetan ibiltzen da beita gogorren bila. 
-                Gomendioa: Hondoan arrantzatu behar da apareju korredizoarekin. 
-                Beita gogorrak erabili: karramarro berdea, tita edo navaja, arrain txikiek jan ez dezaten.""")
+            with st.expander("📌 1. SARGOA"): st.write("Aparraren erregea. 0.8m-1.5m artean onena. Beita: Izkira edo masia.")
+            with st.expander("🐠 2. LUPINA"): st.write("Oso argia. Egunsentian spinning egiteko ezin hobea señueloekin.")
+            with st.expander("🐟 3. TXITXARROA"): st.write("Gauez portuetan. Kakea arina 3 korapilotara luma zuriekin.")
+            with st.expander("🦑 4. TXIPIROIA"): st.write("Ur geldoak. 2.0 poterak tirakada leunekin ilunabarrean.")
+            with st.expander("👑 5. URRABURUA"): st.write("Hondarrezko hondoak. Beita gogorra: karramarroa edo navaja.")
         with e2:
-            with st.expander("🦈 6. DENTOIA (Dentex dentex)"):
-                st.write("""Hondo handietako harraparia, indar handiko arraina. Kantilen eta hondo harritsuetan bizi da. 
-                Gomendioa: Jigging astuna edo beita bizia (txibia edo kalamarra) beharrezkoa da sakonera handian. 
-                Pazientzia handiko arrantza da, baina pieza handiak ematen ditu.""")
-            with st.expander("🐚 7. MOXARRA (Diplodus vulgaris)"):
-                st.write("""Sargoaren familiakoa baina ur lasaiagoetan eta sakonera gutxiagoan ibiltzen da normalean. 
-                Gomendioa: Harri inguruetan kortxoarekin edo hondoan arrantzatzen da beita txikiekin. 
-                Zizareak edo izkira txikiak dira beitarik onenak mozarra deitzeko.""")
-            with st.expander("🦐 8. BARBINA / SALMONETEA (Mullus surmuletus)"):
-                st.write("""Hondarrezko hondoetan bizi da, muturrarekin lurra mugituz janari bila (zizareak eta krustazeo txikiak). 
-                Gomendioa: Hondoan arrantzatu amu finekin eta hondarrezko zizarearekin. 
-                Usain handiko beitak behar dituzte hondoan detektatzeko.""")
-            with st.expander("🦂 9. KABRARROKA (Scorpaena scrofa)"):
-                st.write("""Harri puruan eta zuloetan bizi den arraina, mugitzen ez dena. Oso preziatua gastronomian. 
-                Gomendioa: Hondoan berun astunarekin eta txipiroi tirekin arrantzatu harri artean. 
-                Kontu handia izan arantzekin desanzuelatzerakoan, pozoitsuak baitira.""")
-            with st.expander("🍥 10. BOGA (Boops boops)"):
-                st.write("""Ur erdi eta azaletik hurbil ibiltzen den arrain txiki eta gosetia. Talde handiak sortzen ditu. 
-                Gomendioa: Kortxo arinarekin eta ogi apurrekin edo zizarearekin arrantzatzen da. 
-                Umeentzako oso dibertigarria da haien abiadura eta gosea dela eta.""")
-    
-    st.divider()
-    st.caption("⚖️ Eusko Jaurlaritzaren araudia errespetatu: neurri txikienak eta kupoak.")
+            with st.expander("🦈 6. DENTOIA"): st.write("Hondo handiko harraparia. Jigging astuna edo beita bizia behar du.")
+            with st.expander("🐚 7. MOXARRA"): st.write("Ur lasaiak. Hondoan arrantzatzen da zizare edo izkira txikiekin.")
+            with st.expander("🦐 8. BARBINA"): st.write("Hondarrezko hondoak. Amu finak eta hondarrezko zizarea erabili.")
+            with st.expander("🦂 9. KABRARROKA"): st.write("Harri puruan bizi da. Hondoan txipiroi tirekin. Kontuz arantzekin!")
+            with st.expander("🍥 10. BOGA"): st.write("Ur erdiak. Kortxo arina eta ogia. Umeentzako dibertigarria.")
