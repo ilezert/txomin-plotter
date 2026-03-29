@@ -9,7 +9,7 @@ from folium import plugins
 from streamlit_folium import st_folium
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-st.set_page_config(page_title="Txomin v.33.5 - Mutriku Master", page_icon="🔱", layout="wide")
+st.set_page_config(page_title="Txomin v.33.6 - Master", page_icon="🔱", layout="wide")
 
 # Verificación de Seguridad para la API Key
 if "OPENWEATHER_API_KEY" in st.secrets:
@@ -23,7 +23,7 @@ ZONA_HORARIA = ZoneInfo("Europe/Madrid")
 
 # --- SIDEBAR: FACTOR CORRECTOR ---
 st.sidebar.header("🛠️ KALIBRAZIOA / AJUSTE")
-st.sidebar.write("Doitu satelitearen datuak errealitatera:")
+st.sidebar.write("Doitu satelitearen datuak:")
 f_viento = st.sidebar.slider("Haizea / Viento (%)", 50, 150, 100) / 100.0
 f_ola = st.sidebar.slider("Olatua / Ola (m)", -1.0, 1.0, 0.0, 0.1)
 
@@ -43,8 +43,8 @@ st.markdown(f"""
         .bg-red {{ background-color: #EF4444; }}
         .activity-badge {{ background: #1E293B; color: #FBBF24; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; display: inline-block; margin: 10px 0; border: 1px solid #FBBF24; }}
         .tide-alert {{ background: rgba(5, 150, 105, 0.85); border-radius: 10px; padding: 10px; text-align: center; font-weight: bold; margin-bottom: 20px; border: 1px solid #34D399; font-size: 1.1rem; }}
-        .scroll-wrapper {{ display: flex !important; flex-direction: row !important; overflow-x: auto !important; gap: 12px; padding: 10px 0 20px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; width: 100%; }}
-        .hour-card {{ flex: 0 0 auto; width: 165px; background: rgba(255, 255, 255, 0.95); border-top: 5px solid #0369A1; border-radius: 12px; padding: 12px; text-align: center; color: #1E293B !important; scroll-snap-align: start; box-shadow: 2px 2px 8px rgba(0,0,0,0.2); }}
+        .scroll-wrapper {{ display: flex !important; flex-direction: row !important; overflow-x: auto !important; gap: 12px; padding: 10px 0 20px 0; width: 100%; }}
+        .hour-card {{ flex: 0 0 auto; width: 165px; background: rgba(255, 255, 255, 0.95); border-top: 5px solid #0369A1; border-radius: 12px; padding: 12px; text-align: center; color: #1E293B !important; box-shadow: 2px 2px 8px rgba(0,0,0,0.2); }}
         .hour-card h4 {{ margin: 0 0 8px 0; color: #0369A1 !important; font-size: 1.1rem; font-weight: 800; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px; }}
         .hour-card p {{ margin: 5px 0; font-size: 0.85rem; font-weight: 700; color: #334155 !important; display: flex; justify-content: space-between; align-items: center; }}
         .val {{ color: #0369A1; font-weight: 900; }}
@@ -86,7 +86,8 @@ def fetch_master_data():
     try:
         url_m = f"https://marine-api.open-meteo.com/v1/marine?latitude={LAT_MUTRIKU}&longitude={LON_MUTRIKU}&hourly=wave_height,wave_direction,ocean_current_velocity,ocean_current_direction,sea_surface_temperature&timezone=auto&forecast_days=7"
         url_w = f"https://api.open-meteo.com/v1/forecast?latitude={LAT_MUTRIKU}&longitude={LON_MUTRIKU}&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,pressure_msl&timezone=auto&forecast_days=7"
-        dm, dw = requests.get(url_m).json(), requests.get(url_w).json()
+        dm = requests.get(url_m).json()
+        dw = requests.get(url_w).json()
         df = pd.DataFrame({
             'time': pd.to_datetime(dm['hourly']['time']).dt.tz_localize('UTC').dt.tz_convert(ZONA_HORARIA),
             'wave_h': dm['hourly']['wave_height'], 'wave_d': dm['hourly']['wave_direction'],
@@ -96,14 +97,18 @@ def fetch_master_data():
             'wind_d': dw['hourly']['wind_direction_10m'], 'pres': dw['hourly']['pressure_msl']
         })
         return df
-    except: return None
+    except:
+        return None
 
 # --- 3. INTERFAZ ---
-st.title("🔱 Txomin v.33.5 - Mutriku Tactical")
-df_master = fetch_master_data()
+st.title("🔱 Txomin v.33.6 - Mutriku Tactical")
 ahora_local = datetime.now(ZONA_HORARIA)
 
+# CREAMOS LAS PESTAÑAS PRIMERO (Para que siempre sean visibles)
 tab0, tab1, tab2, tab3 = st.tabs(["⚓ ORAIN", "📅 4 EGUN", "🗺️ MAPA", "🐟 ESPEZIEAK"])
+
+# INTENTAMOS CARGAR LOS DATOS
+df_master = fetch_master_data()
 
 if df_master is not None:
     # Sincronización horaria exacta
@@ -130,30 +135,7 @@ if df_master is not None:
         
         st.write("### ⏱️ GAURKO EBOLUZIOA (2 ORDURO)")
         html_c = "<div class='scroll-wrapper'>"
-        for i in range(idx_ahora, idx_ahora + 16, 2):
-            if i < len(df_master):
-                r = df_master.iloc[i]
-                v_a, v_g = r['wind_s'] * 3.6 * f_viento, r['wind_g'] * 3.6 * f_viento
-                o, c = r['wave_h'] + f_ola, r['curr_v'] * 3.6
-                html_c += f"<div class='hour-card'><h4>{r['time'].strftime('%H:%M')}</h4><p>🌬️ Haizea <span class='val'>{v_a:.0f}/{v_g:.0f} {flecha_desde(r['wind_d'])}</span></p><p>🌊 Olatua <span class='val'>{o:.1f}m {flecha_desde(r['wave_d'])}</span></p><p>💧 Korr. <span class='val'>{c:.1f} {flecha_hacia(r['curr_d'])}</span></p><span class='rec-badge'>{'KORTXOA' if o > 0.8 else 'JIGGING'}</span></div>"
-        st.markdown(html_c + "</div>", unsafe_allow_html=True)
-
-    with tab1:
-        st.header("📅 4 Eguneko Iragarpen Taktikoa")
-        hoy = ahora_local.date()
-        for i in range(1, 5):
-            d_target = hoy + timedelta(days=i)
-            p, b, coef = generar_marea_aprox(d_target)
-            idx_list = df_master[df_master['time'].dt.date == d_target].index
-            if not idx_list.empty:
-                idx_12 = idx_list[12] if len(idx_list) > 12 else idx_list[0]
-                r12 = df_master.iloc[idx_12]
-                v_a12, v_g12, o_12 = r12['wind_s']*3.6*f_viento, r12['wind_g']*3.6*f_viento, r12['wave_h']+f_ola
-                c_cls, s_txt = get_semaforo_info(o_12, v_a12, v_g12)
-                est = calcular_actividad(o_12, v_a12, coef, r12['sst'], r12['pres'])
-                
-                st.markdown(f"<div class='day-forecast-card'><div class='status-bar {c_cls}'></div><div class='card-content'><div style='display:flex; justify-content:space-between;'><h3>{d_target.strftime('%A, %b %d')}</h3><b>{s_txt}</b></div><div class='activity-badge'>Jarduera: {est}</div><p style='color:#0369A1; font-weight:bold;'>🔼 {p} | 🔽 {b} | Coef: {coef}</p><div class='scroll-wrapper'>", unsafe_allow_html=True)
-                html_day = ""
-                df_day = df_master[df_master['time'].dt.date == d_target].iloc[8:22:2]
-                for _, r in df_day.iterrows():
-                    v_a, v_g, o, c = r['wind_s']*3.6*f_viento,
+        for i in range(idx_ahora, min(idx_ahora + 16, len(df_master)), 2):
+            r = df_master.iloc[i]
+            v_a, v_g = r['wind_s'] * 3.6 * f_viento, r['wind_g'] * 3.6 * f_viento
+            o, c = r['wave_h'] + f_ola, r
