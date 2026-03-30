@@ -104,7 +104,7 @@ def fetch_marine():
     except: return None
 
 # --- 3. ESTRUCTURA Y PESTAÑAS ---
-st.markdown("<h1 class='main-title'>🔱 MUTRIKU TACTICAL</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>🔱 TXOMIN PATROIA </h1>", unsafe_allow_html=True)
 
 tab0, tab1, tab2, tab3 = st.tabs(["⚓ ORAIN", "📅 4 EGUN", "🗺️ MAPA", "🐟 ESPEZIEAK"])
 
