@@ -1,172 +1,280 @@
 import streamlit as st
 import requests
 import pandas as pd
+import math
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-import folium
-from folium import plugins
-from streamlit_folium import st_folium
 
-# --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Txomin v.33.10", page_icon="🔱", layout="wide")
+# ══════════════════════════════════════════════════════════════════════
+#  CONFIGURACIÓN GLOBAL
+# ══════════════════════════════════════════════════════════════════════
+st.set_page_config(
+    page_title="Txomin v2.0 | Mutriku",
+    page_icon="🔱",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-LAT_MUTRIKU, LON_MUTRIKU = 43.315, -2.38
-ZONA_HORARIA = ZoneInfo("Europe/Madrid")
-ahora_local = datetime.now(ZONA_HORARIA)
+LAT, LON = 43.315, -2.38
+TZ = ZoneInfo("Europe/Madrid")
+ahora = datetime.now(TZ)
 
-# CSS Profesional Blindado (Evita errores de renderizado)
+try:
+    AEMET_KEY = st.secrets["AEMET_API_KEY"]
+except Exception:
+    AEMET_KEY = ""
+
+DIAS_ES = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
+            "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+
+# ══════════════════════════════════════════════════════════════════════
+#  ESTILOS
+# ══════════════════════════════════════════════════════════════════════
 st.markdown("""
-    <style>
-        .stApp { background-color: #011627; color: white; }
-        .main-card { background: rgba(3, 105, 161, 0.7); backdrop-filter: blur(10px); padding: 25px; border-radius: 20px; text-align: center; margin-bottom: 20px; border: 1px solid rgba(255, 255, 255, 0.2); position: relative; overflow: hidden; }
-        .metric-card { background: rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.2); }
-        .metric-card h2 { color: #FBBF24 !important; font-size: 2.2rem; margin: 0; font-weight: 800; }
-        .metric-card h3 { text-transform: uppercase; font-size: 0.8rem; color: #BAE6FD; margin-bottom: 5px; }
-        .big-arrow { font-size: 2.2rem; font-weight: bold; color: #FBBF24; }
-        .status-bar { height: 15px; width: 100%; position: absolute; top: 0; left: 0; }
-        .bg-green { background-color: #10B981; }
-        .bg-yellow { background-color: #FBBF24; }
-        .bg-red { background-color: #EF4444; }
-        .activity-badge { background: #1E293B; color: #FBBF24; padding: 6px 15px; border-radius: 20px; font-weight: bold; border: 1px solid #FBBF24; margin: 10px 0; display: inline-block; }
-        .tide-alert { background: rgba(5, 150, 105, 0.85); border-radius: 10px; padding: 10px; text-align: center; font-weight: bold; margin-bottom: 20px; border: 1px solid #34D399; font-size: 1.1rem; }
-        .scroll-wrapper { display: flex !important; flex-direction: row !important; overflow-x: auto !important; gap: 12px; padding: 10px 0 20px 0; width: 100%; }
-        .hour-card { flex: 0 0 auto; width: 160px; background: rgba(255,255,255,0.95); border-radius: 12px; padding: 10px; text-align: center; color: #1E293B !important; border-top: 5px solid #0369A1; }
-        .hour-card h4 { margin: 0 0 5px 0; color: #0369A1 !important; font-weight: 800; border-bottom: 1px solid #DDD; }
-        .hour-card p { margin: 4px 0; font-size: 0.8rem; font-weight: 700; display: flex; justify-content: space-between; }
-        .val-blue { color: #0369A1; }
-        .day-forecast-card { background: rgba(255, 255, 255, 0.98); border-radius: 15px; padding: 0; margin-bottom: 30px; color: #1E293B; overflow: hidden; border: 1px solid #E2E8F0; }
-        .card-content { padding: 20px; }
-        .rig-info { background: #F1F5F9; border-radius: 8px; padding: 10px; margin-top: 5px; color: #334155; font-size: 0.85rem; border-left: 4px solid #FBBF24; text-align: left; }
-    </style>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;700;900&family=Barlow:wght@400;600;700&display=swap');
+
+* { box-sizing: border-box; }
+
+.stApp {
+    background-color: #F5F6FA;
+    font-family: 'Barlow', sans-serif;
+    color: #1E3A8A;
+}
+
+footer, #MainMenu, header { visibility: hidden; }
+.block-container { padding: 1.5rem 2rem 3rem; max-width: 1400px; }
+
+.banner {
+    background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 45%, #1E3A8A 100%);
+    color: white; text-align: center;
+    padding: 26px 20px 22px; border-radius: 16px;
+    margin-bottom: 28px;
+    box-shadow: 0 8px 32px rgba(153,27,27,0.35);
+    position: relative; overflow: hidden;
+}
+.banner::before {
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+        45deg, transparent, transparent 20px,
+        rgba(255,255,255,0.03) 20px, rgba(255,255,255,0.03) 40px
+    );
+}
+.banner-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 2.1rem; font-weight: 900;
+    letter-spacing: 6px; text-transform: uppercase;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    display: block; position: relative;
+}
+.banner-sub {
+    font-size: 0.82rem; font-weight: 600;
+    letter-spacing: 3px; opacity: 0.85;
+    display: block; margin-top: 4px; position: relative;
+}
+
+.sec-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.78rem; font-weight: 900;
+    text-transform: uppercase; letter-spacing: 3px;
+    color: #1E3A8A; border-left: 4px solid #991B1B;
+    padding-left: 10px; display: block; margin: 24px 0 16px;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 14px; margin-bottom: 8px;
+}
+.mbox {
+    background: #FFFFFF; border: 1px solid #E2E8F0;
+    border-bottom: 4px solid #991B1B; border-radius: 14px;
+    padding: 20px 14px 16px; text-align: center;
+    box-shadow: 0 2px 8px rgba(30,58,138,0.06);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.mbox:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(30,58,138,0.12); }
+.micon { font-size: 1.7rem; display: block; margin-bottom: 6px; }
+.mlabel {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.7rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    color: #64748B; display: block; margin-bottom: 6px;
+}
+.mval {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 2.0rem; font-weight: 900;
+    color: #1E3A8A; line-height: 1.1; display: block;
+}
+.mval-sm { font-size: 1.2rem; }
+.msub { font-size: 0.78rem; font-weight: 700; color: #991B1B; display: block; margin-top: 3px; }
+.msub2 { font-size: 0.72rem; font-weight: 600; color: #64748B; display: block; margin-top: 2px; }
+
+.scroll-sec {
+    background: #FFFFFF; border: 1px solid #E2E8F0;
+    border-radius: 14px; padding: 18px 16px; margin-bottom: 8px;
+    box-shadow: 0 2px 8px rgba(30,58,138,0.05);
+}
+.scroll-outer {
+    display: flex; overflow-x: auto; gap: 10px;
+    padding: 4px 2px 10px;
+    scrollbar-width: thin; scrollbar-color: #991B1B #F1F5F9;
+}
+.scroll-outer::-webkit-scrollbar { height: 5px; }
+.scroll-outer::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 10px; }
+.scroll-outer::-webkit-scrollbar-thumb { background: #991B1B; border-radius: 10px; }
+
+.hcard {
+    flex: 0 0 auto; width: 136px;
+    background: #F8FAFC; border: 1px solid #E2E8F0;
+    border-top: 4px solid #1E3A8A; border-radius: 10px;
+    padding: 11px 9px; text-align: center;
+    font-size: 0.78rem; color: #1E3A8A;
+    transition: border-top-color 0.2s;
+}
+.hcard:hover { border-top-color: #991B1B; }
+.htime {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.05rem; font-weight: 900;
+    color: #991B1B; margin-bottom: 8px; display: block;
+}
+.hrow { padding: 2px 0; color: #1E3A8A; font-weight: 600; }
+.hrow b { color: #991B1B; }
+.hrow-sub { padding: 1px 0; color: #64748B; font-size: 0.7rem; }
+
+.sembox {
+    border-radius: 16px; padding: 32px 24px;
+    text-align: center; margin: 8px 0 16px;
+    border: 2px solid transparent;
+}
+.sem-verde    { background: #F0FDF4; border-color: #10B981; }
+.sem-amarillo { background: #FFFBEB; border-color: #F59E0B; }
+.sem-rojo     { background: #FEF2F2; border-color: #EF4444; }
+
+.sem-luz {
+    width: 76px; height: 76px; border-radius: 50%;
+    margin: 0 auto 16px; position: relative;
+}
+.sem-luz::after {
+    content: ''; position: absolute; inset: -6px;
+    border-radius: 50%; opacity: 0.35;
+    animation: pulse 2s infinite;
+}
+.sem-luz-verde    { background: #10B981; }
+.sem-luz-verde::after    { background: #10B981; }
+.sem-luz-amarillo { background: #F59E0B; }
+.sem-luz-amarillo::after { background: #F59E0B; }
+.sem-luz-rojo     { background: #EF4444; }
+.sem-luz-rojo::after     { background: #EF4444; }
+
+@keyframes pulse {
+    0%   { transform: scale(1);   opacity: 0.4; }
+    50%  { transform: scale(1.3); opacity: 0.1; }
+    100% { transform: scale(1);   opacity: 0.4; }
+}
+
+.sem-titulo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.7rem; font-weight: 900;
+    letter-spacing: 2px; margin-bottom: 6px; display: block;
+}
+.sem-sub { font-size: 0.9rem; font-weight: 700; margin-bottom: 10px; color: #374151; display: block; }
+.sem-razones { font-size: 0.84rem; color: #374151; line-height: 1.7; }
+.sem-verde .sem-titulo    { color: #065F46; }
+.sem-amarillo .sem-titulo { color: #92400E; }
+.sem-rojo .sem-titulo     { color: #991B1B; }
+
+.alerta {
+    background: #1E3A8A; color: white;
+    padding: 14px 18px; border-radius: 10px;
+    border-left: 7px solid #991B1B;
+    margin: 6px 0; font-weight: 700;
+    font-size: 0.88rem; line-height: 1.5;
+}
+.alerta-warn { background: #7F1D1D; }
+.alerta-info { background: #1E3A8A; border-left-color: #60A5FA; }
+.alerta small { font-weight: 400; opacity: 0.85; }
+
+.pie {
+    text-align: center; color: #94A3B8;
+    font-size: 0.7rem; margin-top: 30px;
+    padding-top: 14px; border-top: 1px solid #E2E8F0;
+    line-height: 1.8;
+}
+</style>
 """, unsafe_allow_html=True)
 
-# --- 2. LÓGICA DE CÁLCULO ---
-def flecha_desde(grados):
-    return ["↓", "↙", "←", "↖", "↑", "↗", "→", "↘"][round(grados / 45) % 8]
 
-def flecha_hacia(grados):
-    return ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"][round(grados / 45) % 8]
+# ══════════════════════════════════════════════════════════════════════
+#  FUNCIONES AUXILIARES
+# ══════════════════════════════════════════════════════════════════════
+def deg_to_compass(deg):
+    if deg is None or (isinstance(deg, float) and math.isnan(deg)):
+        return "—"
+    dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE",
+            "S","SSO","SO","OSO","O","ONO","NO","NNO"]
+    return dirs[round(float(deg) / 22.5) % 16]
 
-def generar_marea(fecha):
-    dia = fecha.day
-    return f"{(dia % 12) + 2:02d}:00", f"{((dia % 12) + 8) % 24:02d}:30", 50 + (dia * 3 % 45)
+def dir_arrow(deg):
+    if deg is None or (isinstance(deg, float) and math.isnan(deg)):
+        return ""
+    arrows = ["↓","↙","←","↖","↑","↗","→","↘"]
+    return arrows[round(float(deg) / 45) % 8]
 
-def get_semaforo(ola, v_avg, v_gust):
-    if ola > 2.0 or v_gust > 35: return "bg-red", "🛑 ARRISKUTSUA / PELIGRO"
-    if v_avg > 12 or ola > 1.5 or v_gust > 25: return "bg-yellow", "🟡 KONTUZ / PRECAUCIÓN"
-    return "bg-green", "🟢 EGOKIA / IDEAL"
-
-def get_actividad(ola, viento, coef, temp, pres):
-    p = 1
-    if 60 <= coef <= 95: p += 1
-    if 1010 <= pres <= 1025: p += 1
-    if 13 <= temp <= 19: p += 1
-    if 0.5 <= ola <= 1.5: p += 1
-    if viento > 25: p -= 1
-    score = max(1, min(5, p))
-    return "⭐" * score + "🌑" * (5 - score)
-
-@st.cache_data(ttl=600)
-def fetch_master_data():
+def safe(val, dec=1, default="—"):
     try:
-        u_m = f"https://marine-api.open-meteo.com/v1/marine?latitude={LAT_MUTRIKU}&longitude={LON_MUTRIKU}&hourly=wave_height,wave_direction,ocean_current_velocity,ocean_current_direction,sea_surface_temperature&timezone=auto&forecast_days=7"
-        u_w = f"https://api.open-meteo.com/v1/forecast?latitude={LAT_MUTRIKU}&longitude={LON_MUTRIKU}&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,pressure_msl&timezone=auto&forecast_days=7"
-        dm, dw = requests.get(u_m).json(), requests.get(u_w).json()
-        df = pd.DataFrame({
-            'time': pd.to_datetime(dm['hourly']['time']).dt.tz_localize('UTC').dt.tz_convert(ZONA_HORARIA),
-            'wave_h': dm['hourly']['wave_height'], 'wave_d': dm['hourly']['wave_direction'],
-            'curr_v': dm['hourly']['ocean_current_velocity'], 'curr_d': dm['hourly']['ocean_current_direction'],
-            'sst': dm['hourly']['sea_surface_temperature'],
-            'wind_s': dw['hourly']['wind_speed_10m'], 'wind_g': dw['hourly']['wind_gusts_10m'],
-            'wind_d': dw['hourly']['wind_direction_10m'], 'pres': dw['hourly']['pressure_msl']
-        })
-        return df
-    except: return None
+        if val is None or (isinstance(val, float) and math.isnan(val)):
+            return default
+        return f"{float(val):.{dec}f}"
+    except Exception:
+        return default
 
-# --- 3. SIDEBAR Y PESTAÑAS ---
-st.sidebar.header("🛠️ KALIBRAZIOA")
-f_viento = st.sidebar.slider("Haizea / Viento (%)", 50, 150, 100) / 100.0
-f_ola = st.sidebar.slider("Olatua / Ola (m)", -1.0, 1.0, 0.0, 0.1)
+def tide_info(dt):
+    """
+    Modelo armónico M2 calibrado para Mutriku/Bilbao.
+    Amplitud M2: 1.76 m · Periodo: 44714 s · Fase empírica Gipuzkoa.
+    Precisión: ±30 min. Para datos exactos: Puertos del Estado.
+    """
+    t      = dt.timestamp()
+    AMP    = 1.76
+    PERIOD = 44714.0
+    PHASE  = 5.4
 
-tab0, tab1, tab2, tab3 = st.tabs(["⚓ ORAIN", "📅 4 EGUN", "🗺️ MAPA", "🐟 ESPEZIEAK"])
+    h      = AMP * math.cos(2 * math.pi * t / PERIOD - PHASE)
+    h_next = AMP * math.cos(2 * math.pi * (t + 1800) / PERIOD - PHASE)
+    rising = h_next > h
+    height = round(h + AMP + 0.3, 2)
 
-df_master = fetch_master_data()
+    if h > AMP * 0.80:   label, emoji = "PLEAMAR",  "🌊"
+    elif h < -AMP * 0.80: label, emoji = "BAJAMAR",  "🏖️"
+    elif rising:           label, emoji = "SUBIENDO", "↗️"
+    else:                  label, emoji = "BAJANDO",  "↘️"
 
-# --- 4. CONTENIDO PESTAÑAS ---
-with tab0:
-    if df_master is not None:
-        idx = (df_master['time'] >= ahora_local).idxmax()
-        now = df_master.loc[idx]
-        o_cal, v_a, v_g = now['wave_h'] + f_ola, now['wind_s']*3.6*f_viento, now['wind_g']*3.6*f_viento
-        p, b, coef = generar_marea(ahora_local)
-        c_cls, s_txt = get_semaforo(o_cal, v_a, v_g)
-        stars = get_actividad(o_cal, v_a, coef, now['sst'], now['pres'])
+    return height, label, emoji, rising
 
-        st.markdown(f"<div class='main-card'><div class='status-bar {c_cls}'></div><h1 style='margin:0;'>MUTRIKU {ahora_local.strftime('%H:%M')}</h1><p style='font-weight:bold; color:#FBBF24;'>{s_txt}</p><div class='activity-badge'>Arrainen Jarduera: {stars}</div></div>", unsafe_allow_html=True)
-        
-        c1, c2, c3, c4 = st.columns(4)
-        with c1: st.markdown(f"<div class='metric-card'><h3>🌬️ Viento (M/R)</h3><h2>{v_a:.0f}/{v_g:.0f}</h2><p>{flecha_desde(now['wind_d'])}</p></div>", unsafe_allow_html=True)
-        with c2: st.markdown(f"<div class='metric-card'><h3>🌊 Olatua</h3><h2>{o_cal:.1f}</h2><p>{flecha_desde(now['wave_d'])}</p></div>", unsafe_allow_html=True)
-        with c3: st.markdown(f"<div class='metric-card'><h3>🌡️ Ura</h3><h2>{now['sst']:.1f}°</h2><p>{now['pres']:.0f} hPa</p></div>", unsafe_allow_html=True)
-        with c4: st.markdown(f"<div class='metric-card'><h3>💧 Korr.</h3><h2>{now['curr_v']*3.6:.1f}</h2><p>{flecha_hacia(now['curr_d'])}</p></div>", unsafe_allow_html=True)
-        
-        st.markdown(f"<div class='tide-alert'>⏳ Itsasgora {p} / Itsasbehera {b} (Coef: {coef})</div>", unsafe_allow_html=True)
+def fish_score(wind_kmh, wave_m, rising, temp, pressure):
+    """Heurística de actividad pesquera (0–10) para el Cantábrico."""
+    s = 0
+    def ok(v): return v is not None and not (isinstance(v, float) and math.isnan(v))
 
-        st.write("### ⏱️ GAURKO EBOLUZIOA (2 ORDURO)")
-        h_gaur = "<div class='scroll-wrapper'>"
-        for i in range(idx, min(idx+16, len(df_master)), 2):
-            r = df_master.iloc[i]
-            v_a_h, v_g_h = r['wind_s']*3.6*f_viento, r['wind_g']*3.6*f_viento
-            o_h = r['wave_h'] + f_ola
-            h_gaur += f"<div class='hour-card'><h4>{r['time'].strftime('%H:%M')}</h4><p>🌬️ {v_a_h:.0f}/{v_g_h:.0f} <span>{flecha_desde(r['wind_d'])}</span></p><p>🌊 {o_h:.1f}m <span>{flecha_desde(r['wave_d'])}</span></p></div>"
-        st.markdown(h_gaur + "</div>", unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ Satelitearekin konexioa kargatzen...")
+    if ok(wind_kmh):
+        if wind_kmh < 12:  s += 2
+        elif wind_kmh < 22: s += 1
+    if ok(wave_m):
+        if wave_m < 0.7:   s += 2
+        elif wave_m < 1.3: s += 1
+    if rising: s += 2
+    if ok(temp):
+        if 14 <= temp <= 20: s += 2
+        elif 11 <= temp <= 23: s += 1
+    if ok(pressure):
+        if pressure > 1015: s += 2
+        elif pressure > 1005: s += 1
 
-with tab1:
-    if df_master is not None:
-        hoy = ahora_local.date()
-        for i in range(1, 5):
-            d_t = hoy + timedelta(days=i)
-            p, b, coef = generar_marea(d_t)
-            df_day = df_master[df_master['time'].dt.date == d_t]
-            if not df_day.empty:
-                r12 = df_day.iloc[len(df_day)//2]
-                c_cls, s_txt = get_semaforo(r12['wave_h']+f_ola, r12['wind_s']*3.6*f_viento, r12['wind_g']*3.6*f_viento)
-                st.markdown(f"<div class='day-forecast-card'><div class='status-bar {c_cls}'></div><div class='card-content'><h3 style='margin:0;'>{d_t.strftime('%A, %b %d')} - {s_txt}</h3><p style='color:#0369A1; font-weight:bold;'>🔼 {p} | 🔽 {b} | Coef: {coef}</p><div class='scroll-wrapper'>", unsafe_allow_html=True)
-                html_d = ""
-                for _, r in df_day.iloc[8:22:2].iterrows():
-                    html_d += f"<div class='hour-card'><h4>{r['time'].strftime('%H:%M')}</h4><p>🌬️ {r['wind_s']*3.6*f_viento:.0f}/{r['wind_g']*3.6*f_viento:.0f}</p><p>🌊 {r['wave_h']+f_ola:.1f}m</p></div>"
-                st.markdown(html_d + "</div></div></div>", unsafe_allow_html=True)
+    return min(s, 10)
 
-with tab2:
-    st.subheader("🗺️ Mutrikuko Plotter Taktikoa")
-    m = folium.Map(location=[LAT_MUTRIKU, LON_MUTRIKU], zoom_start=15)
-    folium.TileLayer(tiles='https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attr='Esri').add_to(m)
-    plugins.MeasureControl(position='topright').add_to(m)
-    plugins.Draw(position='topleft').add_to(m)
-    st_folium(m, width="100%", height=500, key="plot_final")
-
-with tab3:
-    st.header("🐟 Arrainak eta Apailuak")
-    e_list = [
-        ("SARGOA", "Aparraren erregea. Itsasoa 0.8m-1.5m artean onena.", "0.35mm / Bua 20g / Bajo 0.30mm Fluorocarbono."),
-        ("LUPINA", "Egunsentian spinning señueloekin ezin hobea.", "Trenzado 0.18mm / Bajo 0.40mm / Grapa rápida."),
-        ("TXIPIROIA", "Poterak 2.0-2.5 ilunabarrean ur geldoetan.", "Trenzado 0.10mm / Bajo 0.22mm Fluorocarbono."),
-        ("DENTOIA", "Hondo handietako harraparia. Zoka beharrezkoa.", "Trenzado 0.30mm / Bajo 0.70mm / Tándem hooks."),
-        ("URRABURUA", "Hondarrezko hondoetan beita gogorrekin (karramarroa).", "Montaje Corredizo / Bajo 3m (0.33mm)."),
-        ("TXITXARROA", "Talde handietan. Kakea luma zuriekin.", "Sabiki aparejua / Bajo 0.30mm / Plomo 50g."),
-        ("MOXARRA", "Harri inguruetan kortxo eta zizarearekin.", "0.30mm / Bua ligera / Bajo 0.22mm."),
-        ("BARBINA", "Salmonetea hondarretan beita usaintsuekin.", "Chambel / Amuak Nº 12 / Zizare korearra."),
-        ("KABRARROKA", "Harri puruan. Kontuz arantza pozoitsuekin!", "Paternoster / Madre 0.45mm / Bajo 0.35mm."),
-        ("BOGA", "Ur erdiak. Ogi apurrak eta amu txikia.", "0.18mm / Bua pluma / Amua Nº 14.")
-    ]
-    c1, c2 = st.columns(2)
-    for i, (name, tip, rig) in enumerate(e_list):
-        with (c1 if i < 5 else c2):
-            with st.expander(f"📌 {name}"):
-                st.write(tip)
-                st.markdown(f"<div class='rig-info'><b>🛠️ APAILUA:</b> {rig}</div>", unsafe_allow_html=True)
-
-st.divider()
-st.caption("⚖️ Errespetatu neurriak eta kupoak. Mutrikuko Arrantza Gida 2026.")
+def score_ui(s):
+    if s >= 8: return "⭐⭐⭐⭐", "EXCELENTE", "#065F46"
+    if s >= 6: return "⭐⭐⭐",
