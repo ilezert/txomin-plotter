@@ -536,14 +536,14 @@ st.markdown(f"""
 st.markdown("<span class='sec-title'>⏱️ PREVISIÓN TÁCTICA — CADA 2 HORAS (hasta las 00:00)</span>",
             unsafe_allow_html=True)
 
-medianoche = ahora.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-future     = df[(df['time'] > ahora) & (df['time'] <= medianoche)].copy()
+medianoche   = ahora.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+future       = df[(df['time'] > ahora) & (df['time'] <= medianoche)].copy()
 horas_scroll = future.iloc[::2]
 
 if horas_scroll.empty:
     st.info("No hay datos de previsión para el resto del día.")
 else:
-    scroll_html = "<div class='scroll-sec'><div class='scroll-outer'>"
+    cards_html = ""
     for _, r in horas_scroll.iterrows():
         _, t_lbl, t_em, _ = tide_info(r['time'])
         rv     = fv(r['v_media'])
@@ -554,20 +554,45 @@ else:
         rt     = fv(r['temp'])
         rd     = fv(r['v_dir'])
 
-        scroll_html += f"""
-        <div class='hcard'>
-            <span class='htime'>{r['time'].strftime('%H:%M')}</span>
-            <div class='hrow'>🌬️ <b>{safe(rv,0)}/{safe(rvc,0)}</b> km/h</div>
-            <div class='hrow-sub'>{dir_arrow(rd)} {deg_to_compass(rd)}</div>
-            <div class='hrow'>🌊 <b>{safe(ro)} m</b></div>
-            <div class='hrow'>🌀 <b>{safe(rc_kmh)} km/h</b></div>
-            <div class='hrow'>{t_em} <b>{t_lbl}</b></div>
-            <div class='hrow'>🌡️ <b>{safe(rt)}°C</b></div>
+        cards_html += f"""
+        <div style="flex:0 0 auto; width:136px; background:#F8FAFC;
+                    border:1px solid #E2E8F0; border-top:4px solid #1E3A8A;
+                    border-radius:10px; padding:11px 9px; text-align:center;
+                    font-size:0.78rem; color:#1E3A8A; font-family:sans-serif;">
+            <div style="font-size:1.05rem; font-weight:900; color:#991B1B;
+                        margin-bottom:8px;">{r['time'].strftime('%H:%M')}</div>
+            <div style="padding:2px 0; font-weight:600;">
+                &#127783; <b style="color:#991B1B;">{safe(rv,0)}/{safe(rvc,0)}</b> km/h
+            </div>
+            <div style="padding:1px 0; color:#64748B; font-size:0.7rem;">
+                {dir_arrow(rd)} {deg_to_compass(rd)}
+            </div>
+            <div style="padding:2px 0; font-weight:600;">
+                &#127754; <b style="color:#991B1B;">{safe(ro)} m</b>
+            </div>
+            <div style="padding:2px 0; font-weight:600;">
+                &#128256; <b style="color:#991B1B;">{safe(rc_kmh)} km/h</b>
+            </div>
+            <div style="padding:2px 0; font-weight:600;">
+                {t_em} <b style="color:#991B1B;">{t_lbl}</b>
+            </div>
+            <div style="padding:2px 0; font-weight:600;">
+                &#127777; <b style="color:#991B1B;">{safe(rt)}°C</b>
+            </div>
         </div>
         """
-    st.markdown(scroll_html + "</div></div>", unsafe_allow_html=True)
 
-
+    full_html = f"""
+    <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:14px;
+                padding:18px 16px; box-shadow:0 2px 8px rgba(30,58,138,0.05);">
+        <div style="display:flex; overflow-x:auto; gap:10px;
+                    padding:4px 2px 10px;
+                    scrollbar-width:thin; scrollbar-color:#991B1B #F1F5F9;">
+            {cards_html}
+        </div>
+    </div>
+    """
+    components.html(full_html, height=220, scrolling=False)
 # ══════════════════════════════════════════════════════════════════════
 #  SEMÁFORO DE SEGURIDAD
 # ══════════════════════════════════════════════════════════════════════
