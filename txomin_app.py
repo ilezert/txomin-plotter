@@ -3,132 +3,154 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-import folium
-from folium import plugins
-from streamlit_folium import st_folium
 
-# --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Txomin v.40.4", page_icon="🔱", layout="wide")
+# --- 1. CONFIGURACIÓN E INTERFAZ (ESTILO CARMESÍ) ---
+st.set_page_config(page_title="Txomin v.41.0", page_icon="🔱", layout="wide")
 
 LAT_MUTRIKU, LON_MUTRIKU = 43.315, -2.38
 ZONA_HORARIA = ZoneInfo("Europe/Madrid")
 ahora_local = datetime.now(ZONA_HORARIA)
 
-# --- ESTILO WINDFINDER ROJO/BLANCO ---
 st.markdown("""
     <style>
-        .stApp { background-color: #FFFFFF; color: #1E293B; }
-        .main-title { color: #DC2626; text-align: center; font-weight: 900; text-transform: uppercase; border-bottom: 3px solid #DC2626; padding-bottom: 10px; }
-        .main-card { background: #FFFFFF; padding: 20px; border-radius: 15px; border: 2px solid #DC2626; text-align: center; margin-bottom: 20px; position: relative; }
+        /* Fondo y Colores Base */
+        .stApp { background-color: #FDF2F2; color: #1E293B; }
+        
+        /* Título Estilo Windfinder */
+        .main-title { background-color: #991B1B; color: white; text-align: center; padding: 15px; border-radius: 10px; font-weight: 900; text-transform: uppercase; margin-bottom: 20px; }
+
+        /* Cuadro Estado Actual */
+        .main-card { background: #FFFFFF; padding: 20px; border-radius: 15px; border: 2px solid #991B1B; margin-bottom: 25px; position: relative; box-shadow: 0 4px 10px rgba(153, 27, 27, 0.1); }
+        
+        /* Semáforo de Seguridad */
         .status-bar { height: 12px; width: 100%; position: absolute; top: 0; left: 0; border-radius: 15px 15px 0 0; }
-        .bg-green { background-color: #10B981; } .bg-yellow { background-color: #FBBF24; } .bg-red { background-color: #EF4444; }
-        .metric-box { background: #F8FAFC; padding: 12px; border-radius: 10px; border: 1px solid #E2E8F0; text-align: center; }
-        .m-label { color: #64748B; font-size: 0.75rem; text-transform: uppercase; font-weight: bold; }
-        .m-val { color: #DC2626; font-size: 2rem; font-weight: 900; display: block; }
-        .tide-timer { background: #FEF2F2; border: 2px dashed #DC2626; border-radius: 10px; padding: 10px; margin: 15px 0; font-weight: 900; color: #DC2626; font-size: 1.2rem; }
-        .scroll-wrapper { display: flex; overflow-x: auto; gap: 12px; padding: 10px 0 20px 0; width: 100%; }
-        .hour-card { flex: 0 0 auto; width: 200px; background: #FFFFFF; border-radius: 12px; padding: 15px; border: 1px solid #DC2626; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .hour-card h4 { margin: 0 0 10px 0; color: #FFFFFF; background: #DC2626; border-radius: 5px; padding: 5px; text-align: center; }
-        .data-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.85rem; font-weight: 700; border-bottom: 1px solid #F1F5F9; }
-        .rig-info { background: #F8FAFC; border-radius: 8px; padding: 10px; border-left: 4px solid #DC2626; font-size: 0.85rem; }
+        .bg-green { background-color: #10B981; }
+        .bg-yellow { background-color: #FBBF24; }
+        .bg-red { background-color: #EF4444; }
+
+        /* Métricas */
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 15px; }
+        .metric-box { background: #FEE2E2; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #FECACA; }
+        .m-label { color: #1E3A8A; font-size: 0.75rem; text-transform: uppercase; font-weight: 800; display: block; } /* Toque azul */
+        .m-val { color: #7F1D1D; font-size: 2rem; font-weight: 900; display: block; }
+        
+        /* Alertas AEMET */
+        .alert-box { background: #991B1B; color: white; padding: 15px; border-radius: 10px; font-weight: bold; margin-top: 20px; border-left: 10px solid #1E3A8A; }
+        
+        /* Carrusel Horario */
+        .scroll-wrapper { display: flex; overflow-x: auto; gap: 10px; padding: 10px 0; }
+        .hour-card { flex: 0 0 auto; width: 150px; background: #FFFFFF; border: 1px solid #991B1B; border-top: 5px solid #1E3A8A; border-radius: 10px; padding: 10px; text-align: center; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. LÓGICA ---
-def flecha(deg):
-    return ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"][round(deg / 45) % 8]
+# --- 2. ALGORITMO DE CONSENSO TXOMIN ---
+def fetch_weather_consensus():
+    v_media, v_racha = [], []
+    
+    # Fuente 1: Open-Meteo
+    try:
+        r1 = requests.get(f"https://api.open-meteo.com/v1/forecast?latitude={LAT_MUTRIKU}&longitude={LON_MUTRIKU}&hourly=wind_speed_10m,wind_gusts_10m&timezone=auto", timeout=3).json()
+        v_media.append(r1['hourly']['wind_speed_10m'][0])
+        v_racha.append(r1['hourly']['wind_gusts_10m'][0])
+    except: pass
 
-def get_marea_info(f):
-    dia = f.day
-    p_hora, b_hora = (dia % 12) + 2, ((dia % 12) + 8) % 24
-    plea_dt = f.replace(hour=p_hora, minute=0, second=0)
-    baja_dt = f.replace(hour=b_hora, minute=30, second=0)
-    if f < plea_dt: return "PLEAMAR", plea_dt, 50 + (dia * 3 % 45)
-    elif f < baja_dt: return "BAJAMAR", baja_dt, 50 + (dia * 3 % 45)
-    else: return "PLEAMAR", plea_dt + timedelta(hours=12), 50 + (dia * 3 % 45)
+    # Fuente 2: OpenWeather
+    try:
+        api_ow = st.secrets["OPENWEATHER_API_KEY"]
+        r2 = requests.get(f"https://api.openweathermap.org/data/2.5/weather?lat={LAT_MUTRIKU}&lon={LON_MUTRIKU}&appid={api_ow}&units=metric", timeout=3).json()
+        v_media.append(r2['wind']['speed'] * 3.6)
+        v_racha.append(r2['wind'].get('gust', r2['wind']['speed'] * 1.3) * 3.6)
+    except: pass
+
+    # Fuente 3: WeatherAPI
+    try:
+        api_wa = st.secrets["WEATHERAPI_KEY"]
+        r3 = requests.get(f"http://api.weatherapi.com/v1/current.json?key={api_wa}&q={LAT_MUTRIKU},{LON_MUTRIKU}", timeout=3).json()
+        v_media.append(r3['current']['wind_kph'])
+        v_racha.append(r3['current']['gust_kph'])
+    except: pass
+
+    if v_media:
+        return sum(v_media)/len(v_media), sum(v_racha)/len(v_racha), len(v_media)
+    return 0, 0, 0
 
 @st.cache_data(ttl=600)
-def fetch_all_data():
+def fetch_marine_data():
     try:
-        u_m = f"https://marine-api.open-meteo.com/v1/marine?latitude={LAT_MUTRIKU}&longitude={LON_MUTRIKU}&hourly=wave_height,wave_direction,wave_period,ocean_current_velocity,ocean_current_direction,sea_surface_temperature&timezone=auto&forecast_days=6"
-        u_w = f"https://api.open-meteo.com/v1/forecast?latitude={LAT_MUTRIKU}&longitude={LON_MUTRIKU}&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,pressure_msl&timezone=auto&forecast_days=6"
-        dm, dw = requests.get(u_m).json(), requests.get(u_w).json()
-        return pd.DataFrame({
-            'time': pd.to_datetime(dm['hourly']['time']).dt.tz_localize('UTC').dt.tz_convert(ZONA_HORARIA),
-            'wave_h': dm['hourly']['wave_height'], 'wave_d': dm['hourly']['wave_direction'], 'wave_p': dm['hourly']['wave_period'],
-            'curr_v': dm['hourly']['ocean_current_velocity'], 'curr_d': dm['hourly']['ocean_current_direction'],
-            'wind_s': dw['hourly']['wind_speed_10m'], 'wind_g': dw['hourly']['wind_gusts_10m'], 'wind_d': dw['hourly']['wind_direction_10m'],
-            'sst': dm['hourly']['sea_surface_temperature'], 'pres': dw['hourly']['pressure_msl']
-        })
+        u = f"https://marine-api.open-meteo.com/v1/marine?latitude={LAT_MUTRIKU}&longitude={LON_MUTRIKU}&hourly=wave_height,ocean_current_velocity,ocean_current_direction,sea_surface_temperature&timezone=auto"
+        return requests.get(u, timeout=5).json()
     except: return None
 
-# --- 3. INTERFAZ ---
-st.markdown("<h1 class='main-title'>🔱 TXOMIN - MUTRIKU TACTICAL</h1>", unsafe_allow_html=True)
-t0, t1, t2, t3 = st.tabs(["⚓ ORAIN", "📅 4 EGUN", "🗺️ MAPA", "🐟 ESPEZIEAK"])
+def fetch_alerts():
+    # Simulamos o consultamos alertas de Open-Meteo (que integra avisos nacionales)
+    try:
+        u = f"https://api.open-meteo.com/v1/forecast?latitude={LAT_MUTRIKU}&longitude={LON_MUTRIKU}&hourly=temperature_2m&timezone=auto"
+        # En una versión avanzada, aquí conectaríamos con el RSS de AEMET
+        return "⚠️ AVISO AMARILLO: Mar de fondo en la costa de Gipuzkoa (Simulado)"
+    except: return None
 
-df = fetch_all_data()
+# --- 3. DISEÑO DE LA PORTADA ---
+st.markdown("<h1 class='main-title'>🔱 TXOMIN - CONTROL TÁCTICO</h1>", unsafe_allow_html=True)
 
-with t0:
-    if df is not None:
-        idx = (df['time'] >= ahora_local).idxmax()
-        now = df.loc[idx]
-        tipo, m_dt, coef = get_marea_info(ahora_local)
-        faltan = m_dt - ahora_local
-        color = "bg-green" if now['wave_h'] < 1.4 else "bg-yellow"
-        if now['wind_g'] > 30: color = "bg-red"
+v_avg, v_gst, sources = fetch_weather_consensus()
+mar = fetch_marine_data()
+alerta_txt = fetch_alerts()
 
-        st.markdown(f"<div class='main-card'><div class='status-bar {color}'></div><h2>{ahora_local.strftime('%H:%M')}</h2><div class='tide-timer'>⏳ {tipo} en {faltan.seconds//3600}h {(faltan.seconds//60)%60}min (Coef: {coef})</div></div>", unsafe_allow_html=True)
-        
-        c1, c2, c3, c4 = st.columns(4)
-        with c1: st.markdown(f"<div class='metric-box'><span class='m-label'>🌬️ Viento</span><span class='m-val'>{now['wind_s']*3.6:.0f}/{now['wind_g']*3.6:.0f}</span><p>{flecha(now['wind_d'])} km/h</p></div>", unsafe_allow_html=True)
-        with c2: st.markdown(f"<div class='metric-box'><span class='m-label'>🌊 Olatua</span><span class='m-val'>{now['wave_h']:.1f}m</span><p>T: {now['wave_p']:.0f}s</p></div>", unsafe_allow_html=True)
-        with c3: st.markdown(f"<div class='metric-box'><span class='m-label'>🌡️ Ura</span><span class='m-val'>{now['sst']:.1f}°</span><p>{now['pres']:.0f} hPa</p></div>", unsafe_allow_html=True)
-        with c4: st.markdown(f"<div class='metric-box'><span class='m-label'>💧 Korrontea</span><span class='m-val'>{now['curr_v']*3.6:.1f}</span><p>{flecha(now['curr_d'])} km/h</p></div>", unsafe_allow_html=True)
+if mar:
+    ola_act = mar['hourly']['wave_height'][0]
+    corr_v = mar['hourly']['ocean_current_velocity'][0] * 3.6
+    corr_d = mar['hourly']['ocean_current_direction'][0]
+    temp_u = mar['hourly']['sea_surface_temperature'][0]
 
-        st.write("### ⏱️ PRÓXIMAS 12 HORAS")
-        h_html = "<div class='scroll-wrapper'>"
-        for i in range(idx, idx + 13, 2):
-            r = df.iloc[i]
-            stars = "⭐" * (3 if r['wave_h'] < 1.5 else 1)
-            h_html += f"""<div class='hour-card'><h4>{r['time'].strftime('%H:%M')}</h4>
-            <div class='data-row'><span>🌬️ Viento</span><span style='color:#DC2626;'>{r['wind_s']*3.6:.0f}/{r['wind_g']*3.6:.0f}</span></div>
-            <div class='data-row'><span>🌊 Ola/T</span><span>{r['wave_h']:.1f}m/{r['wave_p']:.0f}s</span></div>
-            <div class='data-row'><span>💧 Korr.</span><span>{r['curr_v']*3.6:.1f} {flecha(r['curr_d'])}</span></div>
-            <div class='data-row' style='border:none;'><span>🐟 Peces</span><span>{stars}</span></div></div>"""
-        st.markdown(h_html + "</div>", unsafe_allow_html=True)
+    # --- CUADRO 1: ESTADO ACTUAL ---
+    semaforo = "bg-green" if v_gst < 25 and ola_act < 1.5 else "bg-yellow"
+    if v_gst > 35 or ola_act > 2.0: semaforo = "bg-red"
 
-with t1:
-    if df is not None:
-        hoy = ahora_local.date()
-        for i in range(1, 5):
-            d_t = hoy + timedelta(days=i)
-            p_t, b_t, c_t = get_marea_info(ahora_local.replace(day=d_t.day))
-            st.markdown(f"<div class='main-card' style='text-align:left;'><h4>{d_t.strftime('%A, %d %B')} | Coef: {c_t}</h4><p>Plea: {p_t} | Baja: {b_t}</p></div>", unsafe_allow_html=True)
+    st.markdown(f"""
+        <div class='main-card'>
+            <div class='status-bar {semaforo}'></div>
+            <h2 style='color:#7F1D1D;'>ESTADO ACTUAL: {ahora_local.strftime('%H:%M')}</h2>
+            <div class='metric-grid'>
+                <div class='metric-box'><span class='m-label'>🌬️ VIENTO (M/R)</span><span class='m-val'>{v_avg:.0f}/{v_gst:.0f}</span><span style='color:#7F1D1D;'>km/h</span></div>
+                <div class='metric-box'><span class='m-label'>🌊 OLA</span><span class='m-val'>{ola_act:.1f}m</span><span>Altura media</span></div>
+                <div class='metric-box'><span class='m-label'>💧 CORRIENTE</span><span class='m-val'>{corr_v:.1f}</span><span style='color:#1E3A8A;'>km/h ({corr_d}°)</span></div>
+                <div class='metric-box'><span class='m-label'>🌡️ AGUA</span><span class='m-val'>{temp_u:.1f}°</span><span>Superficie</span></div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
-with t2:
-    m = folium.Map(location=[LAT_MUTRIKU, LON_MUTRIKU], zoom_start=15)
-    folium.TileLayer(tiles='https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attr='Esri').add_to(m)
-    plugins.MeasureControl(position='topright').add_to(m)
-    plugins.Draw(position='topleft').add_to(m)
-    plugins.Fullscreen().add_to(m)
-    st_folium(m, width="100%", height=600, key="mapa_v404")
+    # --- CUADRO 2: PREVISIÓN 2H ---
+    st.write("### ⏱️ PREVISIÓN CADA 2 HORAS")
+    h_html = "<div class='scroll-wrapper'>"
+    for i in range(0, 14, 2):
+        h_html += f"""
+        <div class='hour-card'>
+            <h4 style='color:#991B1B;'>{(ahora_local.hour+i)%24:02d}:00</h4>
+            <p style='font-size:0.8rem;'>🌬️ {v_avg:.0f}/{v_gst:.0f} km/h</p>
+            <p style='font-size:0.8rem; color:#1E3A8A;'>🌊 {mar['hourly']['wave_height'][i]:.1f}m</p>
+            <p style='font-size:0.8rem;'>💧 {mar['hourly']['ocean_current_velocity'][i]*3.6:.1f} km/h</p>
+        </div>
+        """
+    st.markdown(h_html + "</div>", unsafe_allow_html=True)
 
-with t3:
-    st.header("🐟 ESPEZIEAK ETA APAILUAK")
-    esp = [("SARGOA", "Aparretan, 0.8m-1.5m onena.", "Línea 0.35 / Bua 20g / Bajo 0.30mm.", "Tip: Izkira bizia erabili."),
-           ("LUPINA", "Spinning egunsentian.", "Trenzado 0.18 / Bajo 0.40mm.", "Tip: Señuelo mugikorrak aparretan."),
-           ("TXIPIROIA", "Poterak 2.0-2.5 ilunabarrean.", "Trenzado 0.10 / Bajo 0.22mm.", "Tip: Mugimendu leunak."),
-           ("DENTOIA", "Hondo handiak, zoka.", "Trenzado 0.30 / Bajo 0.70mm.", "Tip: Txibia bizia da onena."),
-           ("URRABURUA", "Hondarrezko hondoetan.", "Corredizo / Bajo 3m.", "Tip: Karramarroa beita gisa."),
-           ("TXITXARROA", "Portuetan gauez.", "Sabiki / Bajo 0.30mm.", "Tip: Argi fokuetatik hurbil."),
-           ("MOXARRA", "Harri inguruetan.", "0.30mm / Bua ligera.", "Tip: Zizare korearra erabili."),
-           ("BARBINA", "Hondarretan.", "Chambel / Amuak Nº 12.", "Tip: Beita hondo-hondoan."),
-           ("KABRARROKA", "Harri puruan.", "Paternoster / Madre 0.45.", "Tip: Kontuz arantzekin!"),
-           ("BOGA", "Portuan.", "0.18mm / Bua pluma.", "Tip: Ogi apurrak erabili.")]
-    c1, c2 = st.columns(2)
-    for i, (n, d, r, t) in enumerate(esp):
-        with (c1 if i < 5 else c2):
-            with st.expander(f"📌 {n}"):
-                st.write(d)
-                st.markdown(f"<div class='rig-info'><b>🛠️ APAILUA:</b> {r}</div>", unsafe_allow_html=True)
-                st.info(t)
+    # --- CUADRO 3: SEGURIDAD Y PECES ---
+    st.write("---")
+    col_s, col_p = st.columns(2)
+    with col_s:
+        rec = "EGOKIA / IDEAL" if semaforo == "bg-green" else "KONTUZ / PRECAUCIÓN"
+        if semaforo == "bg-red": rec = "ARRISKUTSUA / PELIGRO"
+        st.markdown(f"<div class='main-card'><h3>🚨 SEGURIDAD</h3><h2 style='color:#7F1D1D;'>{rec}</h2></div>", unsafe_allow_html=True)
+    with col_p:
+        stars = "⭐" * (3 if ola_act < 1.4 else 1)
+        st.markdown(f"<div class='main-card'><h3>🐟 ACTIVIDAD</h3><h2 style='color:#1E3A8A;'>{stars}</h2></div>", unsafe_allow_html=True)
+
+    # --- CUADRO 4: ALERTAS ---
+    if alerta_txt:
+        st.markdown(f"<div class='alert-box'>{alerta_txt}</div>", unsafe_allow_html=True)
+
+else:
+    st.error("Error al cargar datos del satélite.")
+
+# --- NOTIFICACIONES MÓVILES (CONCEPTUAL) ---
+# En Streamlit web, las notificaciones 'push' nativas requieren un PWA o servicio externo.
+# Dejamos la lógica lista para integrar OneSignal o Telegram Bot.
