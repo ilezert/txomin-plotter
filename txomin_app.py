@@ -8,13 +8,13 @@ from folium import plugins
 from streamlit_folium import st_folium
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Txomin v.33.17", page_icon="🔱", layout="wide")
+st.set_page_config(page_title="Txomin v.33.18", page_icon="🔱", layout="wide")
 
 LAT_MUTRIKU, LON_MUTRIKU = 43.315, -2.38
 ZONA_HORARIA = ZoneInfo("Europe/Madrid")
 ahora_local = datetime.now(ZONA_HORARIA)
 
-# CSS Táctico (Diseño limpio y oscuro)
+# CSS Táctico Profesional
 st.markdown("""
     <style>
         .stApp { background-color: #011627; color: white; }
@@ -26,9 +26,9 @@ st.markdown("""
         .bg-red { background-color: #EF4444; }
         .metric-card { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 15px; border: 1px solid rgba(255,255,255,0.1); text-align: center; height: 100%; }
         .m-label { color: #BAE6FD; font-size: 0.8rem; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 5px; }
-        .m-val { color: #FBBF24; font-size: 2.5rem; font-weight: 900; display: block; line-height: 1; }
+        .m-val { color: #FBBF24; font-size: 2.3rem; font-weight: 900; display: block; line-height: 1; }
         .scroll-wrapper { display: flex; overflow-x: auto; gap: 12px; padding: 10px 0 20px 0; width: 100%; }
-        .hour-card { flex: 0 0 auto; width: 160px; background: rgba(255, 255, 255, 0.95); border-radius: 12px; padding: 12px; text-align: center; color: #1E293B !important; border-top: 5px solid #0369A1; }
+        .hour-card { flex: 0 0 auto; width: 150px; background: rgba(255, 255, 255, 0.95); border-radius: 12px; padding: 12px; text-align: center; color: #1E293B !important; border-top: 5px solid #0369A1; }
         .rig-info { background: #F1F5F9; border-radius: 8px; padding: 10px; margin-top: 5px; color: #334155; font-size: 0.85rem; border-left: 4px solid #FBBF24; text-align: left; }
     </style>
 """, unsafe_allow_html=True)
@@ -95,4 +95,45 @@ with t0:
         c_cls, s_txt = get_semaforo(ola_h, v_avg, v_gust)
         st.markdown(f"<div class='main-card'><div class='status-bar {c_cls}'></div><h2>MUTRIKU {ahora_local.strftime('%H:%M')}</h2><p style='color:#FBBF24; font-weight:bold;'>{s_txt}</p></div>", unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
-        with c1: st.markdown(f"<div class='metric-card'><span class='m-label'>Haizea (M/R)</span><span class='m-val'>{v_avg:.0f}/{v_gust:.0f}
+        # --- LÍNEA CORREGIDA ABAJO ---
+        with c1: st.markdown(f"<div class='metric-card'><span class='m-label'>Haizea (M/R)</span><span class='m-val'>{v_avg:.0f}/{v_gust:.0f}</span><p>km/h</p></div>", unsafe_allow_html=True)
+        with c2: st.markdown(f"<div class='metric-card'><span class='m-label'>Olatua</span><span class='m-val'>{ola_h:.1f}</span><p>Metros</p></div>", unsafe_allow_html=True)
+        with c3: st.markdown(f"<div class='metric-card'><span class='m-label'>Ura</span><span class='m-val'>{sst:.1f}°</span><p>{pres:.0f} hPa</p></div>", unsafe_allow_html=True)
+        with c4: st.markdown(f"<div class='metric-card'><span class='m-label'>Korrontea</span><span class='m-val'>{c_v:.1f}</span><p>{flecha(c_d)}</p></div>", unsafe_allow_html=True)
+        st.info(f"⏳ Plea: {p_t} | Baja: {b_t} | Coef: {coef} | Iturriak: {sources}")
+    else:
+        st.error("Konexio errorea satelitearekin.")
+
+with t1:
+    if mar:
+        hoy = ahora_local.date()
+        for i in range(1, 5):
+            d = hoy + timedelta(days=i)
+            p, b, c = generar_marea(d)
+            st.markdown(f"<div class='main-card' style='text-align:left;'><h4>{d.strftime('%A, %b %d')}</h4><p>🔼 Plea: {p} | 🔽 Baja: {b} | Coef: {c}</p></div>", unsafe_allow_html=True)
+
+with t2:
+    m = folium.Map(location=[LAT_MUTRIKU, LON_MUTRIKU], zoom_start=15)
+    folium.TileLayer(tiles='https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attr='Esri').add_to(m)
+    st_folium(m, width="100%", height=500, key="mapa_v18")
+
+with t3:
+    st.header("🐟 Arrainak eta Aparejoak")
+    e_list = [
+        ("SARGOA", "Aparretan, 0.8m-1.5m onena.", "Línea 0.35 / Bua 20g / Bajo 0.30mm Fluoroc."),
+        ("LUPINA", "Spinning señueloekin egunsentian.", "Trenzado 0.18 / Bajo 0.40mm / Grapa rápida."),
+        ("TXIPIROIA", "Poterak 2.0-2.5 ilunabarrean.", "Trenzado 0.10 / Bajo 0.22mm Fluoroc."),
+        ("DENTOIA", "Hondo handiak, zoka beharrezkoa.", "Trenzado 0.30 / Bajo 0.70mm / Tándem."),
+        ("URRABURUA", "Hondarrezko hondo mistoetan.", "Corredizo / Bajo 3m (0.33mm) / Amu fuerte."),
+        ("TXITXARROA", "Portuetan gauez luma zuriekin.", "Sabiki / Bajo 0.30mm / Plomo 50g."),
+        ("MOXARRA", "Harri inguruetan zizarearekin.", "0.30mm / Bua ligera / Bajo 0.22mm."),
+        ("BARBINA", "Salmonetea hondarretan.", "Chambel / Amuak Nº 12 / Coreana."),
+        ("KABRARROKA", "Harri puruan, kontuz arantzekin.", "Paternoster / Madre 0.45 / Bajo 0.35mm."),
+        ("BOGA", "Ogi apurrak eta amu txikia.", "0.18mm / Bua pluma / Amua Nº 14.")
+    ]
+    col1, col2 = st.columns(2)
+    for i, (name, desc, rig) in enumerate(e_list):
+        with (col1 if i % 2 == 0 else col2):
+            with st.expander(f"📌 {name}"):
+                st.write(desc)
+                st.markdown(f"<div class='rig-info'><b>🛠️ APAREJOA:</b> {rig}</div>", unsafe_allow_html=True)
