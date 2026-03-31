@@ -36,7 +36,7 @@ MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
 # ══════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
 :root {
   --bg:        #050E1F;
@@ -67,7 +67,7 @@ st.markdown("""
   background-image:
     radial-gradient(ellipse 80% 50% at 50% -10%, rgba(56,189,248,0.08) 0%, transparent 60%),
     radial-gradient(ellipse 60% 40% at 100% 100%, rgba(129,140,248,0.05) 0%, transparent 50%);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
   color: var(--text);
 }
 
@@ -89,7 +89,7 @@ footer, #MainMenu, header { visibility: hidden; }
   border-bottom: none;
 }
 .stTabs [data-baseweb="tab"] {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-weight: 700; font-size: 0.78rem;
   letter-spacing: 1.5px; text-transform: uppercase;
   color: var(--text2) !important;
@@ -141,7 +141,7 @@ footer, #MainMenu, header { visibility: hidden; }
   50%      { transform: translateY(-5px); }
 }
 .banner-title {
-  font-family: 'Orbitron', sans-serif;
+  font-family: 'Syne', sans-serif;
   font-size: 1.9rem; font-weight: 900;
   letter-spacing: 4px; text-transform: uppercase;
   background: linear-gradient(90deg, #38BDF8, #818CF8, #38BDF8);
@@ -161,7 +161,7 @@ footer, #MainMenu, header { visibility: hidden; }
 
 /* ─── SECTION TITLE ─────────────────────────────────────── */
 .sec-title {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 0.68rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 3px;
   color: var(--cyan);
@@ -202,7 +202,7 @@ footer, #MainMenu, header { visibility: hidden; }
   color: var(--text3); display: block; margin-bottom: 8px;
 }
 .mval {
-  font-family: 'Orbitron', sans-serif;
+  font-family: 'Syne', sans-serif;
   font-size: 1.8rem; font-weight: 700;
   color: var(--cyan); line-height: 1.1; display: block;
 }
@@ -231,7 +231,7 @@ footer, #MainMenu, header { visibility: hidden; }
 }
 .sbox:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
 .sbox-name { font-size: 0.8rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.sbox-score { font-family:'Orbitron',sans-serif; font-size: 0.68rem; font-weight:700; margin-bottom:6px; }
+.sbox-score { font-family:'Syne',sans-serif; font-size: 0.68rem; font-weight:700; margin-bottom:6px; }
 .sbox-stars { font-size: 0.85rem; margin-bottom: 4px; display:block; }
 .sbox-cond  { font-size: 0.62rem; color: var(--text2); line-height: 1.4; }
 
@@ -264,7 +264,7 @@ footer, #MainMenu, header { visibility: hidden; }
   100% { transform: scale(1);   opacity: 0.5; }
 }
 .sem-titulo {
-  font-family: 'Orbitron', sans-serif;
+  font-family: 'Syne', sans-serif;
   font-size: 1.4rem; font-weight: 900; letter-spacing: 2px;
   margin-bottom: 6px; display: block;
 }
@@ -294,7 +294,7 @@ footer, #MainMenu, header { visibility: hidden; }
   margin-bottom: 16px;
 }
 .day-header {
-  font-family: 'Orbitron', sans-serif;
+  font-family: 'Syne', sans-serif;
   font-size: 0.78rem; font-weight: 700;
   color: var(--amber); letter-spacing: 2px;
   text-transform: uppercase;
@@ -325,7 +325,7 @@ footer, #MainMenu, header { visibility: hidden; }
   position: absolute; top: 0; left: 0; right: 0; height: 4px; border-radius: 16px 16px 0 0;
 }
 .fish-name {
-  font-family: 'Orbitron', sans-serif;
+  font-family: 'Syne', sans-serif;
   font-size: 0.85rem; font-weight: 900;
   color: var(--text); margin-bottom: 2px;
   letter-spacing: 1px;
@@ -896,9 +896,9 @@ with tab2:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Inter:wght@600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Manrope:wght@500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
   *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:#050E1F;font-family:'Inter',sans-serif;}
+  body{background:#050E1F;font-family:'Manrope',sans-serif;}
   #toolbar{
     background:linear-gradient(90deg,#0A1628,#0D1B33);
     padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
@@ -907,7 +907,7 @@ with tab2:
   .tbtn{
     background:rgba(56,189,248,0.1);color:#93C5FD;
     border:1px solid rgba(56,189,248,0.25);border-radius:7px;
-    padding:7px 14px;cursor:pointer;font-family:'Inter',sans-serif;
+    padding:7px 14px;cursor:pointer;font-family:'Manrope',sans-serif;
     font-size:0.75rem;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;
     transition:all 0.18s;white-space:nowrap;
   }
@@ -944,28 +944,187 @@ with tab2:
     border:1px solid rgba(56,189,248,0.2)!important;border-radius:8px!important;}
   .leaflet-control-scale-line{background:rgba(10,22,40,0.9)!important;color:#38BDF8!important;
     border:1px solid rgba(56,189,248,0.3)!important;border-radius:4px!important;}
+
+  /* ── WAYPOINT PANEL ─────────────────────────────────── */
+  #wp-panel {
+    position:absolute; top:0; right:0; width:280px; height:100%;
+    background:#050E1F; border-left:1px solid rgba(56,189,248,0.2);
+    display:flex; flex-direction:column; z-index:1000;
+    transform:translateX(100%); transition:transform 0.28s ease;
+    font-family:'Manrope',sans-serif;
+  }
+  #wp-panel.open { transform:translateX(0); }
+  #wp-panel-head {
+    background:linear-gradient(90deg,#0A1628,#0D1B33);
+    padding:12px 14px; display:flex; align-items:center;
+    justify-content:space-between; border-bottom:1px solid rgba(56,189,248,0.15);
+  }
+  #wp-panel-head span {
+    font-size:0.72rem; font-weight:800; letter-spacing:2px;
+    text-transform:uppercase; color:#38BDF8;
+  }
+  #wp-close {
+    background:none; border:none; color:#64748B; cursor:pointer;
+    font-size:1.1rem; line-height:1; padding:0;
+    transition:color 0.15s;
+  }
+  #wp-close:hover { color:#F43F5E; }
+  #wp-list {
+    flex:1; overflow-y:auto; padding:10px;
+    scrollbar-width:thin; scrollbar-color:#38BDF8 #0A1628;
+  }
+  #wp-list::-webkit-scrollbar { width:4px; }
+  #wp-list::-webkit-scrollbar-thumb { background:#38BDF8; border-radius:4px; }
+  .wp-item {
+    background:#0D1B33; border:1px solid rgba(56,189,248,0.12);
+    border-left:3px solid #38BDF8; border-radius:8px;
+    padding:9px 10px; margin-bottom:8px;
+    transition:border-color 0.15s;
+  }
+  .wp-item:hover { border-color:rgba(56,189,248,0.4); }
+  .wp-item-top { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+  .wp-item-icon { font-size:1rem; }
+  .wp-item-name {
+    font-size:0.78rem; font-weight:700; color:#E2E8F0;
+    flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .wp-item-coords { font-size:0.62rem; color:#475569; font-family:'IBM Plex Mono',monospace; }
+  .wp-item-note { font-size:0.68rem; color:#64748B; margin-top:4px; font-style:italic; }
+  .wp-item-actions { display:flex; gap:5px; margin-top:7px; }
+  .wp-btn {
+    flex:1; padding:4px 0; border:none; border-radius:5px; cursor:pointer;
+    font-size:0.65rem; font-weight:700; letter-spacing:0.5px; transition:all 0.15s;
+  }
+  .wp-btn-go  { background:rgba(56,189,248,0.15); color:#38BDF8; }
+  .wp-btn-go:hover  { background:rgba(56,189,248,0.3); }
+  .wp-btn-del { background:rgba(244,63,94,0.12); color:#F43F5E; }
+  .wp-btn-del:hover { background:rgba(244,63,94,0.25); }
+  #wp-export-btn {
+    margin:10px; padding:9px; border:1px solid rgba(56,189,248,0.2);
+    background:rgba(56,189,248,0.07); color:#38BDF8; border-radius:7px;
+    font-size:0.7rem; font-weight:700; cursor:pointer; letter-spacing:1px;
+    text-transform:uppercase; transition:all 0.15s;
+  }
+  #wp-export-btn:hover { background:rgba(56,189,248,0.15); }
+  #wp-empty {
+    text-align:center; padding:30px 16px; color:#334155;
+    font-size:0.75rem; line-height:1.7;
+  }
+
+  /* ── SAVE DIALOG ────────────────────────────────────── */
+  #wp-dialog {
+    display:none; position:absolute; z-index:2000;
+    background:#0D1B33; border:1px solid rgba(56,189,248,0.35);
+    border-radius:12px; padding:16px; width:240px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.6);
+    font-family:'Manrope',sans-serif;
+  }
+  #wp-dialog h4 {
+    font-size:0.72rem; font-weight:800; color:#38BDF8;
+    letter-spacing:1.5px; text-transform:uppercase; margin-bottom:12px;
+  }
+  .dlg-label { font-size:0.65rem; font-weight:700; color:#64748B;
+    text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; display:block; }
+  .dlg-input {
+    width:100%; background:#050E1F; border:1px solid rgba(56,189,248,0.2);
+    border-radius:6px; padding:7px 10px; color:#E2E8F0; font-size:0.78rem;
+    margin-bottom:10px; outline:none; font-family:'Manrope',sans-serif;
+    transition:border-color 0.15s;
+  }
+  .dlg-input:focus { border-color:#38BDF8; }
+  .dlg-select {
+    width:100%; background:#050E1F; border:1px solid rgba(56,189,248,0.2);
+    border-radius:6px; padding:7px 10px; color:#E2E8F0; font-size:0.78rem;
+    margin-bottom:10px; cursor:pointer; font-family:'Manrope',sans-serif;
+  }
+  .dlg-row { display:flex; gap:8px; }
+  .dlg-btn {
+    flex:1; padding:8px; border:none; border-radius:7px; cursor:pointer;
+    font-size:0.72rem; font-weight:800; letter-spacing:0.5px; transition:all 0.15s;
+  }
+  .dlg-save { background:#38BDF8; color:#050E1F; }
+  .dlg-save:hover { background:#7DD3FC; }
+  .dlg-cancel { background:rgba(255,255,255,0.06); color:#94A3B8; }
+  .dlg-cancel:hover { background:rgba(255,255,255,0.1); }
 </style>
 </head>
 <body>
+<div style="position:relative;overflow:hidden;">
 <div id="toolbar">
   <button class="tbtn" id="btn-measure" onclick="setTool('measure')">&#128207; MEDIR DISTANCIA</button>
   <button class="tbtn" id="btn-bearing" onclick="setTool('bearing')">&#129517; CALCULAR DERROTA</button>
+  <button class="tbtn" id="btn-wp"      onclick="setTool('waypoint')">&#128205; GUARDAR PUNTO</button>
   <button class="tbtn" onclick="clearAll()">&#128465; LIMPIAR</button>
   <div style="width:1px;height:26px;background:rgba(56,189,248,0.2);margin:0 4px;"></div>
   <div id="result-panel">Selecciona herramienta y haz clic en la carta &nbsp;·&nbsp; doble clic para finalizar</div>
+  <div style="margin-left:auto;">
+    <button class="tbtn" onclick="toggleWpPanel()" style="background:rgba(251,191,36,0.12);border-color:rgba(251,191,36,0.3);color:#FBBF24;">
+      &#128196; MIS PUNTOS (<span id="wp-count">0</span>)
+    </button>
+  </div>
 </div>
+
+<!-- SAVE DIALOG -->
+<div id="wp-dialog">
+  <h4>&#128205; GUARDAR PUNTO</h4>
+  <span class="dlg-label">Nombre</span>
+  <input class="dlg-input" id="dlg-name" type="text" placeholder="Ej: Bajo de las Almas...">
+  <span class="dlg-label">Categoría</span>
+  <select class="dlg-select" id="dlg-type">
+    <option value="pesca">🐟 Punto de pesca</option>
+    <option value="fondeo">⚓ Fondeo / Ancla</option>
+    <option value="peligro">⚠️ Peligro / Bajo</option>
+    <option value="referencia">📍 Referencia</option>
+    <option value="ruta">🧭 Punto de ruta</option>
+  </select>
+  <span class="dlg-label">Notas (opcional)</span>
+  <input class="dlg-input" id="dlg-note" type="text" placeholder="Profundidad, especie, marea...">
+  <div class="dlg-row">
+    <button class="dlg-btn dlg-save"   onclick="saveWaypoint()">&#10003; GUARDAR</button>
+    <button class="dlg-btn dlg-cancel" onclick="closeDialog()">&#10005; CANCELAR</button>
+  </div>
+</div>
+
 <div id="map"></div>
 <div id="legend">
   <div class="leg-item"><div class="leg-dot" style="background:#F43F5E;"></div> Roca / Bajo</div>
   <div class="leg-item"><div class="leg-dot" style="background:#FBBF24;"></div> Arenal</div>
   <div class="leg-item"><div class="leg-dot" style="background:#10B981;"></div> Puerto</div>
+  <div class="leg-item" style="gap:3px">
+    <span style="font-size:0.62rem;color:#64748B;margin-right:2px;">Prof:</span>
+    <div style="width:10px;height:12px;background:#ddf0fb;border-radius:2px 0 0 2px;"></div>
+    <div style="width:10px;height:12px;background:#aeddf5;"></div>
+    <div style="width:10px;height:12px;background:#79c5ec;"></div>
+    <div style="width:10px;height:12px;background:#47ade1;"></div>
+    <div style="width:10px;height:12px;background:#1474b8;"></div>
+    <div style="width:10px;height:12px;background:#0c589d;border-radius:0 2px 2px 0;"></div>
+    <span style="font-size:0.6rem;color:#64748B;"> 0→-100m (cada 5m)</span>
+  </div>
   <div class="leg-item"><div class="leg-line" style="background:#3B82F6;opacity:0.7;"></div> Corriente costera</div>
   <div class="leg-item"><div class="leg-line" style="background:#818CF8;opacity:0.7;"></div> Contracorriente</div>
-  <div class="leg-item"><div class="leg-line" style="background:#06B6D4;opacity:0.7;"></div> Corriente de marea</div>
+  <div class="leg-item"><div class="leg-line" style="background:#06B6D4;opacity:0.7;"></div> Cte. marea</div>
   <div class="leg-item"><div class="leg-line" style="border-top:2px dashed #F43F5E;background:none;height:0;width:20px;"></div> Medición</div>
   <div class="leg-item"><div class="leg-line" style="border-top:2px dashed #10B981;background:none;height:0;width:20px;"></div> Derrota</div>
-  <span class="leg-src">OpenSeaMap · ESRI Ocean · EMODnet · OSM</span>
+  <span class="leg-src">OpenSeaMap · ESRI Ocean · EMODnet Bathymetry · OSM</span>
 </div>
+
+<!-- WAYPOINT PANEL -->
+<div id="wp-panel">
+  <div id="wp-panel-head">
+    <span>&#128205; MIS PUNTOS GUARDADOS</span>
+    <button id="wp-close" onclick="toggleWpPanel()">&#10005;</button>
+  </div>
+  <div id="wp-list">
+    <div id="wp-empty">
+      &#128205; Sin puntos guardados.<br>
+      Activa <b>GUARDAR PUNTO</b> y haz<br>clic en la carta para añadir.
+    </div>
+  </div>
+  <button id="wp-export-btn" onclick="exportWaypoints()">
+    &#11123; EXPORTAR COMO TEXTO
+  </button>
+</div>
+</div><!-- /wrapper -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 var map = L.map('map', {
@@ -984,18 +1143,61 @@ var esriRef   = L.tileLayer(
   {attribution:'ESRI Ref',maxZoom:16,opacity:0.9});
 var seamark   = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
   {attribution:'© OpenSeaMap',opacity:1.0});
-var emodColor = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms',
-  {layers:'emodnet:mean_atlas_land',format:'image/png',transparent:true,opacity:0.55,attribution:'EMODnet'});
-var emodCtrs  = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms',
-  {layers:'emodnet:contours',format:'image/png',transparent:true,opacity:0.85,attribution:'EMODnet'});
+
+// ── BATIMETRÍA EMODnet — BANDAS DE COLOR CADA 5m (SLD personalizado) ──────────
+// El SLD define colores distintos por cada 5m de profundidad (0 a -200m)
+var SLD_5M = '<?xml version="1.0" ?>'
+  + '<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld"'
+  + ' xmlns:ogc="http://www.opengis.net/ogc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+  + '<NamedLayer><Name>emodnet:mean_atlas_land</Name><UserStyle><FeatureTypeStyle><Rule>'
+  + '<RasterSymbolizer><ColorMap type="intervals">'
+  + '<ColorMapEntry color="#f0f9ff" quantity="1"    label="tierra"/>'
+  + '<ColorMapEntry color="#ddf0fb" quantity="-2"   label="-2m"/>'
+  + '<ColorMapEntry color="#c7e8f9" quantity="-5"   label="-5m"/>'
+  + '<ColorMapEntry color="#aeddf5" quantity="-10"  label="-10m"/>'
+  + '<ColorMapEntry color="#94d1f1" quantity="-15"  label="-15m"/>'
+  + '<ColorMapEntry color="#79c5ec" quantity="-20"  label="-20m"/>'
+  + '<ColorMapEntry color="#60b9e7" quantity="-25"  label="-25m"/>'
+  + '<ColorMapEntry color="#47ade1" quantity="-30"  label="-30m"/>'
+  + '<ColorMapEntry color="#309fd9" quantity="-35"  label="-35m"/>'
+  + '<ColorMapEntry color="#2190cf" quantity="-40"  label="-40m"/>'
+  + '<ColorMapEntry color="#1a82c4" quantity="-45"  label="-45m"/>'
+  + '<ColorMapEntry color="#1474b8" quantity="-50"  label="-50m"/>'
+  + '<ColorMapEntry color="#1066ab" quantity="-60"  label="-60m"/>'
+  + '<ColorMapEntry color="#0c589d" quantity="-75"  label="-75m"/>'
+  + '<ColorMapEntry color="#094a8e" quantity="-100" label="-100m"/>'
+  + '<ColorMapEntry color="#063b7c" quantity="-150" label="-150m"/>'
+  + '<ColorMapEntry color="#042d6a" quantity="-200" label="-200m"/>'
+  + '<ColorMapEntry color="#021e58" quantity="-500" label="-500m"/>'
+  + '</ColorMap></RasterSymbolizer>'
+  + '</Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>';
+
+var emodBands = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
+  layers:      'emodnet:mean_atlas_land',
+  format:      'image/png',
+  transparent:  true,
+  opacity:      0.72,
+  SLD_BODY:     SLD_5M,
+  attribution: 'EMODnet Bathymetry'
+});
+
+// Isobatas EMODnet estándar — más visibles a zoom alto
+var emodCtrs = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
+  layers:      'emodnet:contours',
+  format:      'image/png',
+  transparent:  true,
+  opacity:      0.95,
+  attribution: 'EMODnet Contours'
+});
 
 esriOcean.addTo(map); esriRef.addTo(map);
-emodColor.addTo(map); emodCtrs.addTo(map); seamark.addTo(map);
+emodBands.addTo(map); emodCtrs.addTo(map); seamark.addTo(map);
 
 L.control.layers(
   {'&#127754; ESRI Ocean + OpenSeaMap':L.layerGroup([esriOcean,esriRef,seamark]),
    '&#128506; OSM + OpenSeaMap':L.layerGroup([osmBase,seamark])},
-  {'&#127928; Batimetría EMODnet':emodColor,'&#10967; Isobatas EMODnet':emodCtrs},
+  {'&#127928; Batimetría 5m (bandas color)': emodBands,
+   '&#10967;  Isobatas EMODnet':             emodCtrs},
   {position:'topright',collapsed:false}
 ).addTo(map);
 
