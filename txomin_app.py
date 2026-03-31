@@ -920,10 +920,6 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── CUADRO DE MAREAS HOY ────────────────────────────────────────
-    st.markdown("<span class='sec-title'>🌊 MAREAS HOY</span>", unsafe_allow_html=True)
-    st.markdown(render_tide_box(ahora), unsafe_allow_html=True)
-
     # ── SCROLL 16 HORAS (8 tarjetas c/2h) ──────────────────────────
     st.markdown("<span class='sec-title'>⏱️ PRÓXIMAS 16 HORAS — CADA 2 HORAS</span>",
                 unsafe_allow_html=True)
@@ -967,8 +963,10 @@ with tab1:
     sp_html += "</div>"
     st.markdown(sp_html, unsafe_allow_html=True)
 
-    # ── SEMÁFORO ────────────────────────────────────────────────────
-    st.markdown("<span class='sec-title'>🚦 SEMÁFORO DE SEGURIDAD</span>", unsafe_allow_html=True)
+    # ── MAREAS + SEMÁFORO (lado a lado) ────────────────────────────
+    st.markdown("<span class='sec-title'>🌊 MAREAS HOY &nbsp;&nbsp;·&nbsp;&nbsp; 🚦 SEGURIDAD MARÍTIMA</span>",
+                unsafe_allow_html=True)
+
     SEM = {
         "verde":    {"box":"sem-verde",    "luz":"sem-luz-verde",
                      "titulo":"✅ RECOMENDABLE",    "sub":"CONDICIONES FAVORABLES PARA SALIR"},
@@ -979,13 +977,18 @@ with tab1:
     }
     s = SEM[nivel]
     razones_html = "".join(f"<div>▸ {r}</div>" for r in razones)
-    st.markdown(f"""
-    <div class='sembox {s["box"]}'>
-      <div class='sem-luz {s["luz"]}'></div>
-      <span class='sem-titulo'>{s["titulo"]}</span>
-      <span class='sem-sub'>{s["sub"]}</span>
-      <div class='sem-razones'>{razones_html}</div>
-    </div>""", unsafe_allow_html=True)
+
+    col_left, col_right = st.columns([3, 2], gap="medium")
+    with col_left:
+        st.markdown(render_tide_box(ahora), unsafe_allow_html=True)
+    with col_right:
+        st.markdown(f"""
+        <div class='sembox {s["box"]}' style='height:100%;'>
+          <div class='sem-luz {s["luz"]}'></div>
+          <span class='sem-titulo'>{s["titulo"]}</span>
+          <span class='sem-sub'>{s["sub"]}</span>
+          <div class='sem-razones'>{razones_html}</div>
+        </div>""", unsafe_allow_html=True)
 
     # ── ALERTAS AEMET ───────────────────────────────────────────────
     if aemet_alerts:
