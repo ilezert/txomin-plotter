@@ -560,9 +560,10 @@ with tab2:
   <div class="leg-item"><div class="leg-line" style="background:#3B82F6;opacity:0.8;"></div> Corriente costera</div>
   <div class="leg-item"><div class="leg-line" style="background:#8B5CF6;opacity:0.8;"></div> Contracorriente</div>
   <div class="leg-item"><div class="leg-line" style="background:#06B6D4;opacity:0.8;"></div> Corriente de marea</div>
+  <div class="leg-item"><div class="leg-line" style="background:linear-gradient(90deg,#0ea5e9,#1d4ed8,#312e81);height:8px;border-radius:3px;opacity:0.8;"></div> Batimetría EMODnet</div>
   <div class="leg-item"><div class="leg-line" style="background:#FF4444;height:3px;border-top:2px dashed #FF4444;background:none;border-radius:0;"></div> Tramo medido</div>
   <div class="leg-item"><div class="leg-line" style="background:#10B981;height:3px;border-top:2px dashed #10B981;background:none;border-radius:0;"></div> Derrota</div>
-  <span class="leg-src">OpenSeaMap &#183; ESRI Ocean &#183; OSM contributors</span>
+  <span class="leg-src">OpenSeaMap &#183; ESRI Ocean &#183; EMODnet &#183; OSM contributors</span>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -586,16 +587,43 @@ var esriRef  = L.tileLayer(
 var seamark  = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
   {attribution:'© OpenSeaMap', opacity:1.0});
 
-// Por defecto: ESRI Ocean (aspecto de carta náutica) + OpenSeaMap (marcas reales)
-esriOcean.addTo(map); esriRef.addTo(map); seamark.addTo(map);
+// ── BATIMETRÍA EMODNET (WMS oficial europeo de profundidades) ──────
+// Capa de color por profundidad
+var emodnetColor = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
+  layers:      'emodnet:mean_atlas_land',
+  format:      'image/png',
+  transparent:  true,
+  opacity:      0.55,
+  attribution: 'EMODnet Bathymetry'
+});
+// Isobatas (líneas de profundidad)
+var emodnetContours = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
+  layers:      'emodnet:contours',
+  format:      'image/png',
+  transparent:  true,
+  opacity:      0.85,
+  attribution: 'EMODnet Contours'
+});
+
+// Por defecto: ESRI Ocean + OpenSeaMap + batimetría EMODnet
+esriOcean.addTo(map); esriRef.addTo(map);
+emodnetColor.addTo(map); emodnetContours.addTo(map);
+seamark.addTo(map);
 
 // Control de capas
 var osmGrp  = L.layerGroup([osmBase, seamark]);
 var esriGrp = L.layerGroup([esriOcean, esriRef, seamark]);
-L.control.layers({
-  '&#127754; Carta ESRI Ocean + OpenSeaMap': esriGrp,
-  '&#128506;  OSM + OpenSeaMap':             osmGrp
-}, {}, {position:'topright', collapsed:true}).addTo(map);
+L.control.layers(
+  {
+    '&#127754; Carta ESRI Ocean + OpenSeaMap': esriGrp,
+    '&#128506;  OSM + OpenSeaMap':             osmGrp
+  },
+  {
+    '&#127928; Batimetría EMODnet (color)':    emodnetColor,
+    '&#10967;  Isobatas EMODnet (contornos)':  emodnetContours
+  },
+  {position:'topright', collapsed:false}
+).addTo(map);
 
 // ── ICONOS ─────────────────────────────────────────────────────────
 function mkIcon(bg, glyph) {
@@ -611,39 +639,45 @@ var iArena = mkIcon('#D97706','&#128032;');
 var iPuerto= mkIcon('#059669','&#9973;');
 
 // ── PUNTOS DE PESCA ────────────────────────────────────────────────
+// NOTA GEOGRÁFICA: El Cantábrico está al NORTE de la costa vasca.
+// La costa corre a ~43.29-43.37°N → el mar está a latitudes MAYORES.
+// Rocas próximas: 43.32-43.40°N  |  Arenales (2-5 NM): 43.38-43.48°N
 var spots = [
-  {lat:43.316,lng:-2.387,name:"Bajo de Mutriku",       type:"rock",depth:"3-8 m",
-   desc:"Bajo rocoso frente a la bocana. Fondo mixto roca-arena. Lubina y muxarra."},
-  {lat:43.308,lng:-2.372,name:"Bajos de Saturraran",   type:"rock",depth:"6-15 m",
-   desc:"Roca frente a la playa de Saturraran. Txitxarro, berdel y faneca en temporada."},
-  {lat:43.334,lng:-2.412,name:"Bajo Otoio",            type:"rock",depth:"4-12 m",
-   desc:"Media milla al ONO de Mutriku. Zona frecuentada de fondo y curricán."},
-  {lat:43.345,lng:-2.450,name:"Bajo Mendexa",          type:"rock",depth:"8-20 m",
-   desc:"Entre Mutriku y Lekeitio. Referencia para besugo y congrio."},
-  {lat:43.362,lng:-2.477,name:"Bajos de Lekeitio",     type:"rock",depth:"5-22 m",
-   desc:"Frente al puerto de Lekeitio. Merluza y besugo en profundidad. Atención a la corriente."},
-  {lat:43.298,lng:-2.300,name:"Bajo de Deba",          type:"rock",depth:"4-10 m",
-   desc:"Frente a la ría de Deba. Lubina y dorada en verano."},
-  {lat:43.316,lng:-2.258,name:"Flysch de Zumaia",      type:"rock",depth:"3-18 m",
-   desc:"Zona de acantilado y flysch. Gran diversidad de fondo. Excelente para pesca de roca."},
-  {lat:43.323,lng:-2.338,name:"Bajo Ondarroa",         type:"rock",depth:"5-14 m",
-   desc:"Frente al puerto de Ondarroa. Zona tradicional de txitxarro y muxarra."},
-  {lat:43.283,lng:-2.355,name:"Arenal de Ondarroa",    type:"sand",depth:"15-30 m",
-   desc:"Fondo arenoso frente a Ondarroa. Lenguado y rodaballo. Mejor con mar tranquila."},
-  {lat:43.272,lng:-2.385,name:"Arenal Mutriku Sur",    type:"sand",depth:"20-40 m",
-   desc:"Plataforma arenosa a 3 millas al S. Merluzón y congrio de noche."},
-  {lat:43.258,lng:-2.440,name:"Arenal del Lea",        type:"sand",depth:"25-45 m",
-   desc:"Entre Lekeitio y Ondarroa. Besugo y palometa en profundidad."},
-  {lat:43.265,lng:-2.300,name:"Arenal de Deba",        type:"sand",depth:"18-35 m",
-   desc:"Frente a la ría de Deba. Lenguado y salmonete en verano."},
-  {lat:43.370,lng:-2.499,name:"Puerto de Lekeitio",    type:"port",depth:"—",
+  // ── ROCAS Y BAJOS (en el mar, norte de la costa) ──
+  {lat:43.326,lng:-2.390,name:"Bajo de Mutriku",      type:"rock",depth:"4-10 m",
+   desc:"Bajo rocoso frente a la bocana del puerto. Fondo mixto roca-arena. Lubina (legatza) y muxarra. Referencia clásica de los arrantzales de Mutriku."},
+  {lat:43.335,lng:-2.358,name:"Bajos de Saturrarán",  type:"rock",depth:"6-15 m",
+   desc:"Extensión de roca al N de la playa de Saturrarán. Txitxarro, berdel y faneca en temporada primaveral."},
+  {lat:43.342,lng:-2.418,name:"Bajo Otoio",           type:"rock",depth:"5-14 m",
+   desc:"Bajo a ~1 NM al NNO del puerto de Mutriku. Zona frecuentada para pesca de fondo y curricán de lubina."},
+  {lat:43.375,lng:-2.458,name:"Bajo Mendexa",         type:"rock",depth:"10-22 m",
+   desc:"Roca submarina entre Mutriku y Lekeitio. Referencia clásica para besugo (bisigua) y congrio."},
+  {lat:43.398,lng:-2.498,name:"Bajos de Lekeitio",    type:"rock",depth:"6-25 m",
+   desc:"Zona de bajo al N del puerto de Lekeitio. Merluzón y besugo a mayor profundidad. Precaución con corriente en mareas vivas."},
+  {lat:43.322,lng:-2.348,name:"Bajo de Deba",         type:"rock",depth:"4-12 m",
+   desc:"Bajo rocoso al N de la ría de Deba. Lubina y dorada en temporada estival. Buen spot de curricán."},
+  {lat:43.326,lng:-2.268,name:"Flysch de Zumaia",     type:"rock",depth:"3-20 m",
+   desc:"Zona de acantilado flysch al N de Zumaia. Gran diversidad bentónica. Excelente para pesca de roca desde embarcación."},
+  {lat:43.348,lng:-2.428,name:"Bajo Ondarroa",        type:"rock",depth:"5-16 m",
+   desc:"Bajo al N del puerto de Ondarroa. Zona tradicional de txitxarro y muxarra. Buen fondo mixto."},
+  // ── ARENALES (plataforma, 2-5 NM al norte) ──
+  {lat:43.392,lng:-2.430,name:"Arenal de Ondarroa",   type:"sand",depth:"18-35 m",
+   desc:"Plataforma arenosa al N de Ondarroa. Lenguado (mielan) y rodaballo. Mejor con mar en calma y pleamar."},
+  {lat:43.380,lng:-2.395,name:"Arenal de Mutriku N",  type:"sand",depth:"22-42 m",
+   desc:"Arenal profundo a ~3 NM al N de Mutriku. Merluzón y congrio. Mejor en pleamar nocturna."},
+  {lat:43.415,lng:-2.462,name:"Arenal del Lea",       type:"sand",depth:"28-50 m",
+   desc:"Fondo arenoso entre Lekeitio y Ondarroa. Besugo y palometa en profundidad. Referencia de bajura del Cantábrico."},
+  {lat:43.358,lng:-2.348,name:"Arenal de Deba",       type:"sand",depth:"20-38 m",
+   desc:"Plataforma arenosa al N de Deba. Lenguado y salmonete en verano. Buen spot de fondeo."},
+  // ── PUERTOS (en sus posiciones reales) ──
+  {lat:43.370,lng:-2.499,name:"Puerto de Lekeitio",   type:"port",depth:"—",
    desc:"Puerto pesquero y deportivo. Lonja activa. Gasoil, agua, avituallamiento. Buen abrigo con S y SO."},
-  {lat:43.316,lng:-2.381,name:"Puerto de Mutriku",     type:"port",depth:"—",
-   desc:"Puerto deportivo y pesquero. Gasoil disponible. Rampa de varada."},
-  {lat:43.303,lng:-2.351,name:"Puerto de Ondarroa",    type:"port",depth:"—",
-   desc:"Mayor puerto pesquero de la zona. Lonja con subasta diaria. Grúa disponible."},
-  {lat:43.292,lng:-2.258,name:"Puerto de Zumaia",      type:"port",depth:"—",
-   desc:"Puerto deportivo junto al flysch. Acceso por ría con corriente en llenante."}
+  {lat:43.309,lng:-2.381,name:"Puerto de Mutriku",    type:"port",depth:"—",
+   desc:"Puerto deportivo y pesquero. Gasoil disponible. Rampa de varada. Abrigo con todos los vientos salvo NNE fuerte."},
+  {lat:43.321,lng:-2.419,name:"Puerto de Ondarroa",   type:"port",depth:"—",
+   desc:"Mayor puerto pesquero de la zona. Lonja con subasta diaria. Grúa disponible. Servicios completos."},
+  {lat:43.299,lng:-2.258,name:"Puerto de Zumaia",     type:"port",depth:"—",
+   desc:"Puerto deportivo junto al flysch. Acceso por ría con corriente en llenante. Club náutico activo."}
 ];
 
 spots.forEach(function(s){
@@ -664,20 +698,37 @@ spots.forEach(function(s){
    .addTo(map);
 });
 
-// ── CORRIENTES ─────────────────────────────────────────────────────
+// ── CORRIENTES (todas en el mar, al norte de la costa) ────────────
+// Costa vasca: ~43.29-43.37°N. Corrientes en franja 43.35-43.55°N
 var currents = [
-  {coords:[[43.32,-2.52],[43.27,-2.52],[43.25,-2.36],[43.30,-2.36]],
-   name:"Corriente Costera del Cantábrico",dir:"E &#10132; O (Corriente de Labradores)",
-   speed:"0.3 – 0.9 kn",note:"Predominante en otoño-invierno. Se intensifica con vientos del ENE.",color:"#3B82F6"},
-  {coords:[[43.27,-2.38],[43.21,-2.38],[43.21,-2.24],[43.27,-2.24]],
-   name:"Contracorriente de Profundidad",dir:"O &#10132; E (franja 20-80 m)",
-   speed:"0.2 – 0.5 kn",note:"Presente en verano-otoño bajo la termoclina. Afecta a palangres de fondo.",color:"#8B5CF6"},
-  {coords:[[43.34,-2.42],[43.30,-2.43],[43.29,-2.37],[43.34,-2.36]],
-   name:"Corriente de Marea – Mutriku",dir:"Variable con la marea",
-   speed:"0.5 – 1.8 kn",note:"Fluye al N en llenante, al S en vaciante. Máxima en cuartos de marea.",color:"#06B6D4"},
-  {coords:[[43.37,-2.51],[43.33,-2.52],[43.33,-2.47],[43.37,-2.46]],
-   name:"Corriente de Marea – Lekeitio",dir:"Variable con la marea",
-   speed:"0.4 – 1.4 kn",note:"Marcada en la bocana. Precaución en mareas vivas con SW.",color:"#06B6D4"}
+  // Corriente costera superficial E→O (0-20 m)
+  {coords:[[43.48,-2.52],[43.38,-2.52],[43.38,-2.25],[43.48,-2.25]],
+   name:"Corriente Costera del Cant&#225;brico",
+   dir:"E &#10132; O &nbsp;(Corriente de Labradores, 0-20 m)",
+   speed:"0.3 – 0.9 kn",
+   note:"Predominante en oto&#241;o-invierno. Se intensifica con vientos del ENE. Afecta a curricanes y boyas de marcaci&#243;n.",
+   color:"#3B82F6"},
+  // Contracorriente profunda O→E (20-80 m)
+  {coords:[[43.38,-2.52],[43.34,-2.52],[43.34,-2.25],[43.38,-2.25]],
+   name:"Contracorriente de Profundidad",
+   dir:"O &#10132; E &nbsp;(franja 20-80 m)",
+   speed:"0.2 – 0.5 kn",
+   note:"Presente en verano-oto&#241;o bajo la termoclina. Afecta a palangres de fondo y aparejos verticales.",
+   color:"#8B5CF6"},
+  // Corriente de marea Mutriku (bocana del puerto)
+  {coords:[[43.345,-2.408],[43.320,-2.408],[43.320,-2.368],[43.345,-2.368]],
+   name:"Corriente de Marea – Mutriku",
+   dir:"Variable con la marea",
+   speed:"0.5 – 1.8 kn",
+   note:"M&#225;xima intensidad en cuartos de marea. Fluye al N en llenante, al S en vaciante. Referencia para calcular la derrota de entrada.",
+   color:"#06B6D4"},
+  // Corriente de marea Lekeitio (bocana)
+  {coords:[[43.402,-2.518],[43.372,-2.518],[43.372,-2.480],[43.402,-2.480]],
+   name:"Corriente de Marea – Lekeitio",
+   dir:"Variable con la marea",
+   speed:"0.4 – 1.4 kn",
+   note:"Especialmente marcada en la bocana y canal de entrada. Precauci&#243;n en mareas vivas.",
+   color:"#06B6D4"}
 ];
 
 currents.forEach(function(c){
@@ -810,9 +861,10 @@ map.on('mousemove',function(e){
     st.markdown("""
     <div class='pie' style='margin-top:10px;'>
         &#128506; Carta N&#225;utica &nbsp;&#183;&nbsp;
-        <b>OpenSeaMap</b> (marcas n&#225;uticas reales: sondas, rocas, boyas) &nbsp;&#183;&nbsp;
+        <b>OpenSeaMap</b> (marcas n&#225;uticas: sondas, rocas, boyas) &nbsp;&#183;&nbsp;
         <b>ESRI Ocean</b> (fondo cartogr&#225;fico) &nbsp;&#183;&nbsp;
-        Puntos de pesca basados en conocimiento local de la costa de Mutriku &nbsp;&#183;&nbsp;
+        <b>EMODnet Bathymetry</b> (batimetr&#237;a oficial europea, isobatas reales) &nbsp;&#183;&nbsp;
+        Puntos de pesca: costa real de Mutriku (mar al norte) &nbsp;&#183;&nbsp;
         Corrientes: modelo emp&#237;rico Cant&#225;brico
     </div>
     """, unsafe_allow_html=True)
