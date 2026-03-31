@@ -366,6 +366,52 @@ footer, #MainMenu, header { visibility: hidden; }
 }
 .pie b { color: var(--text2); }
 
+/* ─── TIDE BOX ──────────────────────────────────────────── */
+.tide-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 8px;
+}
+.tide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px; margin-top: 12px;
+}
+.tide-event {
+  background: var(--bg2);
+  border-radius: 10px; padding: 12px 10px;
+  text-align: center; border: 1px solid var(--border);
+}
+.tide-event-type {
+  font-size: 0.60rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 1.5px; margin-bottom: 4px; display: block;
+}
+.tide-event-time {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.3rem; font-weight: 700;
+  color: var(--navy); display: block; margin-bottom: 3px;
+}
+.tide-event-h {
+  font-size: 0.78rem; font-weight: 700; color: var(--text2); display: block;
+}
+.coef-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 8px; padding: 8px 14px;
+  margin-top: 14px; border: 1px solid currentColor;
+}
+.coef-num {
+  font-family: 'Syne', sans-serif;
+  font-size: 2rem; font-weight: 800; line-height: 1;
+}
+.coef-info { text-align: left; }
+.coef-title { font-size: 0.62rem; font-weight: 800; text-transform: uppercase;
+              letter-spacing: 1.5px; display: block; }
+.coef-sub   { font-size: 0.68rem; font-weight: 600; color: var(--text2);
+              display: block; margin-top: 2px; }
+
 /* ─── SPINNER STREAMLIT ─────────────────────────────────── */
 .stSpinner > div { border-top-color: var(--navy) !important; }
 </style>
@@ -407,7 +453,98 @@ def tide_info(dt):
     else:              label,emoji="BAJANDO","↘️"
     return height,label,emoji,rising
 
-def fish_score_general(wind_kmh,wave_m,rising,temp,pressure):
+def daily_tide_events(target_dt):
+    """
+    Calcula pleamares y bajamares de un día dado mediante modelo M2.
+    Escanea cada 5 min para detectar máximos y mínimos locales.
+    Devuelve (lista_eventos, coeficiente_marea).
+    Coeficiente según escala atlántica: 20 (aguas muertas) → 120 (vivas equinocciales).
+    """
+    AMP = 1.76; PERIOD = 44714.0; PHASE = 5.4
+    base = target_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_date = target_dt.date()
+    events = []
+    prev_h = prev_t = None
+
+    for minutes in range(0, 24*60 + 11, 5):
+        t  = base + timedelta(minutes=minutes)
+        ts = t.timestamp()
+        h  = AMP * math.cos(2 * math.pi * ts / PERIOD - PHASE)
+        if prev_h is not None and minutes >= 10:
+            t_bb  = base + timedelta(minutes=minutes - 10)
+            h_bb  = AMP * math.cos(2 * math.pi * t_bb.timestamp() / PERIOD - PHASE)
+            if h_bb < prev_h > h and prev_t.date() == day_date:
+                events.append({'type':'PLEAMAR','emoji':'🌊',
+                                'time':prev_t,
+                                'height':round(prev_h + AMP + 0.3, 2)})
+            elif h_bb > prev_h < h and prev_t.date() == day_date:
+                events.append({'type':'BAJAMAR','emoji':'🏖️',
+                                'time':prev_t,
+                                'height':round(prev_h + AMP + 0.3, 2)})
+        prev_h, prev_t = h, t
+
+    # Coeficiente: rango del día → escala 10–120
+    pl = [e['height'] for e in events if e['type'] == 'PLEAMAR']
+    bj = [e['height'] for e in events if e['type'] == 'BAJAMAR']
+    if pl and bj:
+        rango = max(pl) - min(bj)
+        # Bilbao: aguas muertas ~1.4 m → coef 20 | vivas ~3.8 m → coef 95
+        coef  = int((rango - 1.4) / 2.4 * 75 + 20)
+        coef  = max(10, min(120, coef))
+    else:
+        coef = 50
+
+    return events, coef
+
+def coef_label(c):
+    if c >= 95: return "VIVAS EQUINOCCIALES", "#DC2626"
+    if c >= 70: return "MAREAS VIVAS",        "#EA580C"
+    if c >= 45: return "COEFICIENTE MEDIO",   "#CA8A04"
+    return              "AGUAS MUERTAS",       "#16A34A"
+
+def render_tide_box(target_dt, compact=False):
+    """Renderiza el cuadro de mareas del día: pleamares, bajamares y coeficiente."""
+    events, coef = daily_tide_events(target_dt)
+    c_label, c_color = coef_label(coef)
+
+    # Ordenar por hora
+    events_sorted = sorted(events, key=lambda e: e['time'])
+
+    events_html = ""
+    for ev in events_sorted:
+        is_high = ev['type'] == 'PLEAMAR'
+        ev_color = "#0369A1" if is_high else "#059669"
+        events_html += f"""
+        <div class='tide-event'>
+          <span class='tide-event-type' style='color:{ev_color}'>{ev['emoji']} {ev['type']}</span>
+          <span class='tide-event-time'>{ev['time'].strftime('%H:%M')}</span>
+          <span class='tide-event-h'>{ev['height']:.2f} m</span>
+        </div>"""
+
+    if not events_html:
+        events_html = "<div style='color:#94A3B8;font-size:0.8rem;'>Sin datos de marea para este día</div>"
+
+    coef_bg = f"rgba({int(c_color[1:3],16)},{int(c_color[3:5],16)},{int(c_color[5:7],16)},0.08)"
+
+    return f"""
+    <div class='tide-box'>
+      <div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px'>
+        <div>
+          <div style='font-size:0.66rem;font-weight:800;text-transform:uppercase;
+                      letter-spacing:2px;color:var(--text3,#94A3B8);margin-bottom:4px'>
+            🌊 MAREAS DEL DÍA — {target_dt.strftime('%A %d %B').upper()}
+          </div>
+          <div class='tide-grid'>{events_html}</div>
+        </div>
+        <div class='coef-badge' style='color:{c_color};background:{coef_bg}'>
+          <span class='coef-num' style='color:{c_color}'>{coef}</span>
+          <div class='coef-info'>
+            <span class='coef-title' style='color:{c_color}'>{c_label}</span>
+            <span class='coef-sub'>Coeficiente de marea</span>
+          </div>
+        </div>
+      </div>
+    </div>"""
     s=0
     def ok(v): return v is not None and not(isinstance(v,float) and math.isnan(v))
     if ok(wind_kmh):
@@ -781,6 +918,10 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── CUADRO DE MAREAS HOY ────────────────────────────────────────
+    st.markdown("<span class='sec-title'>🌊 MAREAS HOY</span>", unsafe_allow_html=True)
+    st.markdown(render_tide_box(ahora), unsafe_allow_html=True)
+
     # ── SCROLL 16 HORAS (8 tarjetas c/2h) ──────────────────────────
     st.markdown("<span class='sec-title'>⏱️ PRÓXIMAS 16 HORAS — CADA 2 HORAS</span>",
                 unsafe_allow_html=True)
@@ -1086,20 +1227,20 @@ with tab2:
   <div class="leg-item"><div class="leg-dot" style="background:#10B981;"></div> Puerto</div>
   <div class="leg-item" style="gap:3px">
     <span style="font-size:0.62rem;color:#64748B;margin-right:2px;">Prof:</span>
-    <div style="width:10px;height:12px;background:#ddf0fb;border-radius:2px 0 0 2px;"></div>
-    <div style="width:10px;height:12px;background:#aeddf5;"></div>
-    <div style="width:10px;height:12px;background:#79c5ec;"></div>
-    <div style="width:10px;height:12px;background:#47ade1;"></div>
-    <div style="width:10px;height:12px;background:#1474b8;"></div>
-    <div style="width:10px;height:12px;background:#0c589d;border-radius:0 2px 2px 0;"></div>
-    <span style="font-size:0.6rem;color:#64748B;"> 0→-100m (cada 5m)</span>
+    <div style="width:10px;height:12px;background:#b3e5fc;border-radius:2px 0 0 2px;"></div>
+    <div style="width:10px;height:12px;background:#4fc3f7;"></div>
+    <div style="width:10px;height:12px;background:#0288d1;"></div>
+    <div style="width:10px;height:12px;background:#01579b;"></div>
+    <div style="width:10px;height:12px;background:#002652;"></div>
+    <div style="width:10px;height:12px;background:#000e20;border-radius:0 2px 2px 0;"></div>
+    <span style="font-size:0.6rem;color:#64748B;"> GEBCO 2024</span>
   </div>
   <div class="leg-item"><div class="leg-line" style="background:#3B82F6;opacity:0.7;"></div> Corriente costera</div>
   <div class="leg-item"><div class="leg-line" style="background:#818CF8;opacity:0.7;"></div> Contracorriente</div>
   <div class="leg-item"><div class="leg-line" style="background:#06B6D4;opacity:0.7;"></div> Cte. marea</div>
   <div class="leg-item"><div class="leg-line" style="border-top:2px dashed #F43F5E;background:none;height:0;width:20px;"></div> Medición</div>
   <div class="leg-item"><div class="leg-line" style="border-top:2px dashed #10B981;background:none;height:0;width:20px;"></div> Derrota</div>
-  <span class="leg-src">OpenSeaMap · ESRI Ocean · EMODnet Bathymetry · OSM</span>
+  <span class="leg-src">OpenSeaMap · ESRI Ocean · GEBCO 2024 (BODC) · EMODnet · OSM</span>
 </div>
 
 <!-- WAYPOINT PANEL -->
@@ -1138,61 +1279,59 @@ var esriRef   = L.tileLayer(
 var seamark   = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
   {attribution:'© OpenSeaMap',opacity:1.0});
 
-// ── BATIMETRÍA EMODnet — BANDAS DE COLOR CADA 5m (SLD personalizado) ──────────
-// El SLD define colores distintos por cada 5m de profundidad (0 a -200m)
-var SLD_5M = '<?xml version="1.0" ?>'
-  + '<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld"'
-  + ' xmlns:ogc="http://www.opengis.net/ogc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
-  + '<NamedLayer><Name>emodnet:mean_atlas_land</Name><UserStyle><FeatureTypeStyle><Rule>'
-  + '<RasterSymbolizer><ColorMap type="intervals">'
-  + '<ColorMapEntry color="#b3e5fc" quantity="1"    label="tierra"/>'
-  + '<ColorMapEntry color="#81d4fa" quantity="-2"   label="-2m"/>'
-  + '<ColorMapEntry color="#4fc3f7" quantity="-5"   label="-5m"/>'
-  + '<ColorMapEntry color="#29b6f6" quantity="-10"  label="-10m"/>'
-  + '<ColorMapEntry color="#039be5" quantity="-15"  label="-15m"/>'
-  + '<ColorMapEntry color="#0288d1" quantity="-20"  label="-20m"/>'
-  + '<ColorMapEntry color="#0277bd" quantity="-25"  label="-25m"/>'
-  + '<ColorMapEntry color="#01579b" quantity="-30"  label="-30m"/>'
-  + '<ColorMapEntry color="#004d8c" quantity="-35"  label="-35m"/>'
-  + '<ColorMapEntry color="#003d78" quantity="-40"  label="-40m"/>'
-  + '<ColorMapEntry color="#003064" quantity="-45"  label="-45m"/>'
-  + '<ColorMapEntry color="#002652" quantity="-50"  label="-50m"/>'
-  + '<ColorMapEntry color="#001d40" quantity="-60"  label="-60m"/>'
-  + '<ColorMapEntry color="#00152f" quantity="-75"  label="-75m"/>'
-  + '<ColorMapEntry color="#000e20" quantity="-100" label="-100m"/>'
-  + '<ColorMapEntry color="#063b7c" quantity="-150" label="-150m"/>'
-  + '<ColorMapEntry color="#042d6a" quantity="-200" label="-200m"/>'
-  + '<ColorMapEntry color="#021e58" quantity="-500" label="-500m"/>'
-  + '</ColorMap></RasterSymbolizer>'
-  + '</Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>';
+// ── BATIMETRÍA — GEBCO 2024 (British Oceanographic Data Centre) ────────────────
+// PROBLEMA ANTERIOR: SLD_BODY en peticiones WMS por tiles se trunca en URLs largas
+// SOLUCIÓN: GEBCO WMS oficial con capas pre-coloreadas — sin SLD, siempre funciona
+//
+//  GEBCO_LATEST_2 = mapa plano coloreado por cota (azules para océano)
+//  GEBCO_LATEST   = relieve sombreado hillshade
+//  Fuente: wms.gebco.net — BODC / Nippon Foundation-GEBCO Seabed 2030 Project
 
-var emodBands = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
-  layers:      'emodnet:mean_atlas_land',
-  format:      'image/png',
-  transparent:  true,
-  opacity:      0.90,
-  SLD_BODY:     SLD_5M,
-  attribution: 'EMODnet Bathymetry'
+var gebcoBathy = L.tileLayer.wms('https://wms.gebco.net/mapserv?', {
+  layers:     'GEBCO_LATEST_2',
+  styles:     '',
+  format:     'image/png',
+  transparent: true,
+  opacity:     0.80,
+  version:    '1.3.0',
+  attribution:'© GEBCO 2024 / BODC'
 });
 
-// Isobatas EMODnet estándar — más visibles a zoom alto
+var gebcoRelief = L.tileLayer.wms('https://wms.gebco.net/mapserv?', {
+  layers:     'GEBCO_LATEST',
+  styles:     '',
+  format:     'image/png',
+  transparent: true,
+  opacity:     0.65,
+  version:    '1.3.0',
+  attribution:'© GEBCO 2024 / BODC'
+});
+
+// EMODnet isobatas — capa de contornos en su estilo nativo (sin SLD — funciona bien)
 var emodCtrs = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
-  layers:      'emodnet:contours',
-  format:      'image/png',
-  transparent:  true,
-  opacity:      1.0,
-  attribution: 'EMODnet Contours'
+  layers:     'emodnet:contours',
+  styles:     '',
+  format:     'image/png',
+  transparent: true,
+  opacity:     1.0,
+  attribution:'© EMODnet Bathymetry'
 });
 
+// Por defecto: GEBCO color + isobatas EMODnet + marcas OpenSeaMap
 esriOcean.addTo(map); esriRef.addTo(map);
-emodBands.addTo(map); emodCtrs.addTo(map); seamark.addTo(map);
+gebcoBathy.addTo(map); emodCtrs.addTo(map); seamark.addTo(map);
 
 L.control.layers(
-  {'&#127754; ESRI Ocean + OpenSeaMap':L.layerGroup([esriOcean,esriRef,seamark]),
-   '&#128506; OSM + OpenSeaMap':L.layerGroup([osmBase,seamark])},
-  {'&#127928; Batimetría 5m (bandas color)': emodBands,
-   '&#10967;  Isobatas EMODnet':             emodCtrs},
-  {position:'topright',collapsed:false}
+  {
+    '&#127754; ESRI Ocean + OpenSeaMap': L.layerGroup([esriOcean, esriRef, seamark]),
+    '&#128506; OSM + OpenSeaMap':        L.layerGroup([osmBase, seamark])
+  },
+  {
+    '&#127760; GEBCO 2024 — color por profundidad': gebcoBathy,
+    '&#127956; GEBCO 2024 — relieve sombreado':     gebcoRelief,
+    '&#10967;  EMODnet — isobatas (líneas)':        emodCtrs
+  },
+  {position:'topright', collapsed:false}
 ).addTo(map);
 
 function mkIcon(bg,glyph){
@@ -1578,71 +1717,85 @@ loadWaypoints();
 
 
 # ════════════════════════════════════════════════════════════════════
-#  TAB 3 — PREVISIÓN 3 DÍAS (cada 4 horas)
+#  TAB 3 — PREVISIÓN 3 DÍAS (06:00–23:00, cada 3 horas)
 # ════════════════════════════════════════════════════════════════════
 with tab3:
 
-    st.markdown("<span class='sec-title'>📅 PREVISIÓN TÁCTICA — PRÓXIMOS 3 DÍAS (cada 4 horas)</span>",
+    st.markdown("<span class='sec-title'>📅 PREVISIÓN TÁCTICA — PRÓXIMOS 3 DÍAS (06:00 – 23:00, cada 3h)</span>",
                 unsafe_allow_html=True)
 
-    DAY_COLORS = ["#38BDF8", "#FBBF24", "#818CF8"]
+    DAY_COLORS = ["#1D4ED8", "#B45309", "#6D28D9"]
+    HORAS_DIA  = [6, 9, 12, 15, 18, 21, 23]   # franjas horarias a mostrar
 
     for day_offset in range(1, 4):
-        target_date = (ahora + timedelta(days=day_offset)).date()
-        day_rows = df[df['time'].dt.date == target_date].iloc[::4]  # cada 4h
+        d           = ahora + timedelta(days=day_offset)
+        target_date = d.date()
+
+        # Filtrar horas concretas del día
+        day_rows = df[
+            (df['time'].dt.date == target_date) &
+            (df['time'].dt.hour.isin(HORAS_DIA))
+        ].copy()
 
         if day_rows.empty:
             continue
 
-        d = ahora + timedelta(days=day_offset)
+        col       = DAY_COLORS[day_offset - 1]
         day_label = f"{DIAS_ES[d.weekday()].upper()}  {d.day} {MESES_ES[d.month-1].upper()}"
-        col = DAY_COLORS[day_offset - 1]
 
         # Resumen del día
-        def avg(col_name):
-            vals = [fv(r) for r in day_rows[col_name] if fv(r) is not None]
+        def _avg(cn):
+            vals = [fv(r) for r in day_rows[cn] if fv(r) is not None]
             return sum(vals)/len(vals) if vals else None
-        def mx(col_name):
-            vals = [fv(r) for r in day_rows[col_name] if fv(r) is not None]
+        def _mx(cn):
+            vals = [fv(r) for r in day_rows[cn] if fv(r) is not None]
             return max(vals) if vals else None
 
-        avg_wind = avg('v_media'); max_gust = mx('v_racha')
-        avg_wave = avg('ola');     avg_temp = avg('temp')
-        avg_pres = avg('presion')
+        avg_wind = _avg('v_media'); max_gust = _mx('v_racha')
+        avg_wave = _avg('ola');     avg_temp = _avg('temp')
+        avg_pres = _avg('presion')
 
-        # Semáforo del día (usando valores máximos)
-        nivel_dia, _ = semaforo(max_gust, mx('ola'), avg_pres, [])
-        sem_color = {"verde":"#10B981","amarillo":"#FBBF24","rojo":"#F43F5E"}[nivel_dia]
+        nivel_dia, _ = semaforo(max_gust, _mx('ola'), avg_pres, [])
+        sem_color = {"verde":"#059669","amarillo":"#B45309","rojo":"#DC2626"}[nivel_dia]
         sem_icon  = {"verde":"✅","amarillo":"⚠️","rojo":"🚫"}[nivel_dia]
 
+        # Cabecera del día
         st.markdown(f"""
         <div class='day-section'>
           <div class='day-header' style='color:{col}'>
             {day_label}
-            <span style='color:{sem_color};font-family:Inter,sans-serif;
+            <span style='color:{sem_color};font-family:Manrope,sans-serif;
                          font-size:0.72rem;letter-spacing:1px;margin-left:8px;'>
               {sem_icon} {nivel_dia.upper()}
             </span>
-            <span style='color:#475569;font-size:0.65rem;font-family:Inter,sans-serif;
-                         letter-spacing:0px;font-weight:500;'>
-              Viento medio {safe(avg_wind,0)} km/h · Ola media {safe(avg_wave)} m · Agua {safe(avg_temp)}°C
+            <span style='color:#94A3B8;font-size:0.65rem;font-family:Manrope,sans-serif;
+                         font-weight:600;'>
+              Viento medio {safe(avg_wind,0)} km/h &nbsp;·&nbsp;
+              Ola {safe(avg_wave)} m &nbsp;·&nbsp;
+              Agua {safe(avg_temp)}°C
             </span>
           </div>
         </div>""", unsafe_allow_html=True)
 
+        # Cuadro de mareas del día
+        st.markdown(render_tide_box(d), unsafe_allow_html=True)
+
+        # Tarjetas horarias 06–23
         cards = "".join(render_hour_card(r, col) for _, r in day_rows.iterrows())
         components.html(f"""
-        <div style="background:#0A1628;border:1px solid rgba(56,189,248,0.1);
-                    border-radius:10px;padding:14px 14px 6px;margin-bottom:6px;">
+        <div style="background:#FFFFFF;border:1px solid rgba(30,58,138,0.12);
+                    border-radius:10px;padding:14px 14px 6px;margin-bottom:6px;
+                    box-shadow:0 2px 8px rgba(30,58,138,0.07);">
           <div style="display:flex;overflow-x:auto;gap:10px;padding-bottom:8px;
-                      scrollbar-width:thin;scrollbar-color:{col} #0A1628;">
+                      scrollbar-width:thin;scrollbar-color:{col} #E8EEF4;">
             {cards}
           </div>
         </div>""", height=215, scrolling=False)
 
     st.markdown("""
     <div class='pie'>
-      Previsión: <b>Open-Meteo</b> (actualización cada 10 min) ·
+      Previsión: <b>Open-Meteo</b> (actualización cada 10 min) &nbsp;·&nbsp;
+      Mareas: <b>Modelo M2 Cantábrico</b> (±30 min) &nbsp;·&nbsp;
       Semáforo diario basado en valores máximos del día
     </div>""", unsafe_allow_html=True)
 
