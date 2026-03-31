@@ -545,6 +545,8 @@ def render_tide_box(target_dt, compact=False):
         </div>
       </div>
     </div>"""
+
+def fish_score_general(wind_kmh,wave_m,rising,temp,pressure):
     s=0
     def ok(v): return v is not None and not(isinstance(v,float) and math.isnan(v))
     if ok(wind_kmh):
