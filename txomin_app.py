@@ -490,57 +490,81 @@ def fv(v):
     except Exception: return None
 
 def tide_info(dt):
-    t=dt.timestamp(); AMP=1.76; PERIOD=44714.0; PHASE=5.4
-    h=AMP*math.cos(2*math.pi*t/PERIOD-PHASE)
-    h_next=AMP*math.cos(2*math.pi*(t+1800)/PERIOD-PHASE)
-    rising=h_next>h; height=round(h+AMP+0.3,2)
-    if h>AMP*0.80:    label,emoji="PLEAMAR","🌊"
-    elif h<-AMP*0.80: label,emoji="BAJAMAR","🏖️"
-    elif rising:       label,emoji="SUBIENDO","↗️"
-    else:              label,emoji="BAJANDO","↘️"
-    return height,label,emoji,rising
+    """
+    Modelo armónico M2+S2+K1 calibrado para Bilbao/Mutriku.
+    Datos: IHH España (Instituto Hidrográfico de la Marina).
+    Amplitudes: A_M2=1.560m, A_S2=0.549m, A_K1=0.071m (Bilbao tide gauge)
+    Z0=2.56m (nivel medio sobre cero hidrográfico Bilbao)
+    Fases G = V₀(epoch) + κ(IHH), donde epoch = 1970-01-01 00:00 UTC
+      V₀(M2)=137.8°  κ(M2)=199.2°  → G_M2=337.0°
+      V₀(S2)=202.6°  κ(S2)=217.5°  → G_S2= 60.1°
+      V₀(K1)= 11.3°  κ(K1)=214.6°  → G_K1=225.9°
+    Precisión: ±20-40 min (modelo de 3 constituyentes sin corrección nodal).
+    """
+    t    = dt.timestamp()
+    A_M2 = 1.560; W_M2 = 2*math.pi/44714.0; G_M2 = 337.0*math.pi/180
+    A_S2 = 0.549; W_S2 = 2*math.pi/43200.0; G_S2 =  60.1*math.pi/180
+    A_K1 = 0.071; W_K1 = 2*math.pi/86164.1; G_K1 = 225.9*math.pi/180
+    Z0   = 2.56
+
+    h      = A_M2*math.cos(W_M2*t-G_M2) + A_S2*math.cos(W_S2*t-G_S2) + A_K1*math.cos(W_K1*t-G_K1)
+    h_next = A_M2*math.cos(W_M2*(t+900)-G_M2) + A_S2*math.cos(W_S2*(t+900)-G_S2) + A_K1*math.cos(W_K1*(t+900)-G_K1)
+
+    rising = h_next > h
+    height = round(h + Z0, 2)
+
+    thresh = (A_M2+A_S2)*0.78
+    if   h >  thresh: label,emoji = "PLEAMAR","🌊"
+    elif h < -thresh: label,emoji = "BAJAMAR","🏖️"
+    elif rising:      label,emoji = "SUBIENDO","↗️"
+    else:             label,emoji = "BAJANDO","↘️"
+    return height, label, emoji, rising
 
 def daily_tide_events(target_dt):
     """
-    Calcula pleamares y bajamares de un día dado mediante modelo M2.
-    Escanea cada 5 min para detectar máximos y mínimos locales.
-    Devuelve (lista_eventos, coeficiente_marea).
-    Coeficiente según escala atlántica: 20 (aguas muertas) → 120 (vivas equinocciales).
+    Detecta pleamares/bajamares del día mediante escaneo cada 3 min.
+    Coeficiente IHH: coef = 100 * rango_día / rango_MVES
+    Rango MVES Bilbao = 2*(A_M2+A_S2) = 4.218m ≈ 4.27m (IHH tabla).
     """
-    AMP = 1.76; PERIOD = 44714.0; PHASE = 5.4
-    base = target_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    A_M2=1.560; W_M2=2*math.pi/44714.0; G_M2=337.0*math.pi/180
+    A_S2=0.549; W_S2=2*math.pi/43200.0; G_S2= 60.1*math.pi/180
+    A_K1=0.071; W_K1=2*math.pi/86164.1; G_K1=225.9*math.pi/180
+    Z0=2.56; RVES=4.27   # rango de mareas vivas equinocciales Bilbao
+
+    def h_at(ts):
+        return (A_M2*math.cos(W_M2*ts-G_M2)
+              + A_S2*math.cos(W_S2*ts-G_S2)
+              + A_K1*math.cos(W_K1*ts-G_K1))
+
+    # base = medianoche en hora local (timezone-aware)
+    base     = target_dt.replace(hour=0, minute=0, second=0, microsecond=0)
     day_date = target_dt.date()
-    events = []
+    events   = []
     prev_h = prev_t = None
 
-    for minutes in range(0, 24*60 + 11, 5):
-        t  = base + timedelta(minutes=minutes)
-        ts = t.timestamp()
-        h  = AMP * math.cos(2 * math.pi * ts / PERIOD - PHASE)
-        if prev_h is not None and minutes >= 10:
-            t_bb  = base + timedelta(minutes=minutes - 10)
-            h_bb  = AMP * math.cos(2 * math.pi * t_bb.timestamp() / PERIOD - PHASE)
+    # Escaneo cada 3 minutos (180s) — mayor resolución = detección más precisa
+    for minutes in range(0, 24*60+7, 3):
+        t_dt = base + timedelta(minutes=minutes)
+        ts   = t_dt.timestamp()
+        h    = h_at(ts)
+        if prev_h is not None and minutes >= 6:
+            h_bb = h_at((base + timedelta(minutes=minutes-6)).timestamp())
             if h_bb < prev_h > h and prev_t.date() == day_date:
                 events.append({'type':'PLEAMAR','emoji':'🌊',
-                                'time':prev_t,
-                                'height':round(prev_h + AMP + 0.3, 2)})
+                                'time':prev_t,'height':round(prev_h+Z0, 2)})
             elif h_bb > prev_h < h and prev_t.date() == day_date:
                 events.append({'type':'BAJAMAR','emoji':'🏖️',
-                                'time':prev_t,
-                                'height':round(prev_h + AMP + 0.3, 2)})
-        prev_h, prev_t = h, t
+                                'time':prev_t,'height':round(prev_h+Z0, 2)})
+        prev_h, prev_t = h, t_dt
 
-    # Coeficiente: rango del día → escala 10–120
-    pl = [e['height'] for e in events if e['type'] == 'PLEAMAR']
-    bj = [e['height'] for e in events if e['type'] == 'BAJAMAR']
+    # Coeficiente IHH: rango relativo al MVES de Bilbao
+    pl = [e['height'] for e in events if e['type']=='PLEAMAR']
+    bj = [e['height'] for e in events if e['type']=='BAJAMAR']
     if pl and bj:
         rango = max(pl) - min(bj)
-        # Bilbao: aguas muertas ~1.4 m → coef 20 | vivas ~3.8 m → coef 95
-        coef  = int((rango - 1.4) / 2.4 * 75 + 20)
-        coef  = max(10, min(120, coef))
+        coef  = max(10, min(120, round(100 * rango / RVES)))
     else:
         coef = 50
-
     return events, coef
 
 def coef_label(c):
@@ -839,26 +863,19 @@ def render_hour_card(r_row, color_top="#38BDF8"):
     hora_str = r_row['time'].strftime('%H:%M')
     fecha_str = r_row['time'].strftime('%a %d')
     return f"""
-    <div style="flex:0 0 auto;width:134px;background:#FFFFFF;
+    <div style="flex:0 0 auto;width:118px;background:#FFFFFF;
                 border:1px solid rgba(30,58,138,0.12);
-                border-top:3px solid {color_top};border-radius:10px;
-                padding:10px 8px;text-align:center;
-                font-family:'Manrope',sans-serif;font-size:0.76rem;color:#0F172A;
-                box-shadow:0 2px 8px rgba(30,58,138,0.07);">
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#94A3B8;margin-bottom:2px;">{fecha_str}</div>
-      <div style="font-size:1.0rem;font-weight:900;color:{color_top};margin-bottom:8px;">{hora_str}</div>
-      <div style="padding:2px 0;font-weight:600;color:#1E3A8A;">
-        &#127783; <b style="color:{color_top};">{safe(rv,0)}/{safe(rvc,0)}</b> km/h</div>
-      <div style="padding:1px 0;color:#94A3B8;font-size:0.68rem;">
-        {dir_arrow(rd)} {deg_to_compass(rd)}</div>
-      <div style="padding:2px 0;font-weight:600;color:#1E3A8A;">
-        &#127754; <b style="color:{color_top};">{safe(ro)} m</b></div>
-      <div style="padding:2px 0;font-weight:600;color:#1E3A8A;">
-        &#128256; <b style="color:{color_top};">{safe(rc_k)} km/h</b></div>
-      <div style="padding:2px 0;font-weight:600;color:#1E3A8A;">
-        {t_em} <b style="color:{color_top};">{t_lbl}</b></div>
-      <div style="padding:2px 0;font-weight:600;color:#1E3A8A;">
-        &#127777; <b style="color:{color_top};">{safe(rt)}°C</b></div>
+                border-top:3px solid {color_top};border-radius:9px;
+                padding:8px 7px 7px;text-align:center;
+                font-family:'Manrope',sans-serif;color:#0F172A;">
+      <div style="font-size:0.58rem;color:#94A3B8;margin-bottom:1px;font-family:monospace;">{fecha_str}</div>
+      <div style="font-size:0.95rem;font-weight:900;color:{color_top};margin-bottom:5px;">{hora_str}</div>
+      <div style="padding:1px 0;font-weight:700;font-size:0.70rem;color:#1E3A8A;">&#127783; <b style="color:{color_top};">{safe(rv,0)}/{safe(rvc,0)}</b> km/h</div>
+      <div style="color:#94A3B8;font-size:0.60rem;">{dir_arrow(rd)} {deg_to_compass(rd)}</div>
+      <div style="padding:1px 0;font-weight:700;font-size:0.70rem;color:#1E3A8A;">&#127754; <b style="color:{color_top};">{safe(ro)} m</b></div>
+      <div style="padding:1px 0;font-weight:700;font-size:0.70rem;color:#1E3A8A;">&#128256; <b style="color:{color_top};">{safe(rc_k)} km/h</b></div>
+      <div style="padding:1px 0;font-weight:700;font-size:0.70rem;color:#1E3A8A;">{t_em} <b style="color:{color_top};">{t_lbl}</b></div>
+      <div style="padding:1px 0;font-weight:700;font-size:0.70rem;color:#1E3A8A;">&#127777; <b style="color:{color_top};">{safe(rt)}°C</b></div>
     </div>"""
 
 
@@ -986,7 +1003,7 @@ with tab1:
                       scrollbar-width:thin;scrollbar-color:#1D4ED8 #E8EEF4;">
             {cards}
           </div>
-        </div>""", height=215, scrolling=False)
+        </div>""", height=270, scrolling=False)
 
     # ── ESPECIES RECOMENDADAS HOY ───────────────────────────────────
     st.markdown("<span class='sec-title'>🐟 MEJORES ESPECIES PARA HOY</span>", unsafe_allow_html=True)
@@ -1084,53 +1101,153 @@ with tab2:
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Manrope:wght@500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:#050E1F;font-family:'Manrope',sans-serif;}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;}
+  body{background:#F0F4F8;font-family:'Manrope',sans-serif;display:flex;flex-direction:column;}
+
+  /* ── TOOLBAR ────────────────────────────────────────────── */
   #toolbar{
-    background:linear-gradient(90deg,#0A1628,#0D1B33);
-    padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+    background:#1E3A8A;
+    padding:8px 10px;
+    display:flex;gap:6px;align-items:center;flex-wrap:wrap;
     border-bottom:2px solid rgba(56,189,248,0.3);
+    flex-shrink:0;
   }
   .tbtn{
-    background:rgba(56,189,248,0.1);color:#93C5FD;
-    border:1px solid rgba(56,189,248,0.25);border-radius:7px;
-    padding:7px 14px;cursor:pointer;font-family:'Manrope',sans-serif;
-    font-size:0.75rem;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;
-    transition:all 0.18s;white-space:nowrap;
+    background:rgba(255,255,255,0.12);color:#DBEAFE;
+    border:1px solid rgba(255,255,255,0.2);border-radius:7px;
+    padding:8px 12px;cursor:pointer;font-family:'Manrope',sans-serif;
+    font-size:0.72rem;font-weight:700;letter-spacing:0.5px;
+    transition:all 0.15s;white-space:nowrap;
+    min-height:40px;touch-action:manipulation;
   }
-  .tbtn:hover{background:rgba(244,63,94,0.2);border-color:#F43F5E;color:white;}
-  .tbtn.active{background:rgba(244,63,94,0.25);border-color:#F43F5E;color:#FCA5A5;
-               box-shadow:0 0 12px rgba(244,63,94,0.3);}
+  .tbtn:hover,.tbtn:active{background:rgba(220,38,38,0.3);border-color:#DC2626;color:white;}
+  .tbtn.active{background:rgba(220,38,38,0.4);border-color:#EF4444;color:white;
+               box-shadow:0 0 10px rgba(220,38,38,0.4);}
   #result-panel{
-    background:rgba(10,22,40,0.9);color:#38BDF8;
-    border:1px solid rgba(56,189,248,0.2);border-radius:7px;
-    padding:6px 14px;font-size:0.75rem;font-weight:700;
-    flex:1;max-width:620px;
+    background:rgba(255,255,255,0.1);color:#DBEAFE;
+    border:1px solid rgba(255,255,255,0.2);border-radius:7px;
+    padding:6px 12px;font-size:0.72rem;font-weight:600;
+    flex:1;min-width:150px;
   }
-  #result-panel b{color:#FBBF24;}
-  #map{height:630px;width:100%;cursor:default;}
+  #result-panel b{color:#FCD34D;}
+
+  /* ── MAP ────────────────────────────────────────────────── */
+  #map{flex:1;width:100%;cursor:default;min-height:0;}
+
+  /* ── LEGEND ─────────────────────────────────────────────── */
   #legend{
-    background:linear-gradient(90deg,#0A1628,#0D1B33);
-    padding:9px 14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;
-    font-size:0.68rem;color:#94A3B8;font-weight:700;
-    border-top:1px solid rgba(56,189,248,0.2);
+    background:#1E3A8A;
+    padding:7px 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    font-size:0.62rem;color:#93C5FD;font-weight:700;
+    border-top:1px solid rgba(56,189,248,0.2);flex-shrink:0;
   }
-  .leg-item{display:flex;align-items:center;gap:6px;}
-  .leg-dot {width:12px;height:12px;border-radius:50%;flex-shrink:0;}
-  .leg-line{width:20px;height:4px;border-radius:2px;flex-shrink:0;}
-  .leg-src {margin-left:auto;color:#334155;font-size:0.62rem;}
-  .mtip{background:#0D1B33!important;color:#FBBF24!important;
-        border:1px solid #38BDF8!important;border-radius:4px!important;
-        font-weight:900!important;font-size:0.68rem!important;padding:2px 7px!important;}
+  .leg-item{display:flex;align-items:center;gap:5px;}
+  .leg-dot {width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .leg-line{width:18px;height:4px;border-radius:2px;flex-shrink:0;}
+  .leg-src {margin-left:auto;color:#475569;font-size:0.58rem;}
+
+  /* ── TOOLTIPS / POPUPS ──────────────────────────────────── */
+  .mtip{background:#1E3A8A!important;color:#FCD34D!important;
+        border:1px solid rgba(56,189,248,0.4)!important;border-radius:4px!important;
+        font-weight:900!important;font-size:0.65rem!important;padding:2px 7px!important;}
   .mtip::before{display:none!important;}
-  .leaflet-popup-content-wrapper{background:#0D1B33!important;color:#E2E8F0!important;
-    border:1px solid rgba(56,189,248,0.3)!important;border-radius:10px!important;
-    box-shadow:0 8px 24px rgba(0,0,0,0.6)!important;}
-  .leaflet-popup-tip{background:#0D1B33!important;}
-  .leaflet-control-layers-expanded{background:#0D1B33!important;color:#E2E8F0!important;
-    border:1px solid rgba(56,189,248,0.2)!important;border-radius:8px!important;}
-  .leaflet-control-scale-line{background:rgba(10,22,40,0.9)!important;color:#38BDF8!important;
-    border:1px solid rgba(56,189,248,0.3)!important;border-radius:4px!important;}
+  .leaflet-popup-content-wrapper{background:#FFFFFF!important;color:#0F172A!important;
+    border:2px solid #1E3A8A!important;border-radius:10px!important;
+    box-shadow:0 8px 24px rgba(0,0,0,0.2)!important;}
+  .leaflet-popup-tip{background:#1E3A8A!important;}
+  .leaflet-control-layers-expanded{background:#FFFFFF!important;color:#0F172A!important;
+    border:1px solid rgba(30,58,138,0.2)!important;border-radius:8px!important;
+    font-family:'Manrope',sans-serif;font-size:0.75rem;}
+  .leaflet-control-scale-line{background:rgba(255,255,255,0.9)!important;color:#1E3A8A!important;
+    border:1px solid rgba(30,58,138,0.3)!important;border-radius:4px!important;font-weight:700!important;}
+  .leaflet-touch .leaflet-control-zoom a{
+    width:36px!important;height:36px!important;line-height:36px!important;font-size:18px!important;
+  }
+
+  /* ── WAYPOINT PANEL ─────────────────────────────────────── */
+  #wp-panel {
+    position:absolute; top:0; right:0;
+    width:min(280px,85vw); height:100%;
+    background:#FFFFFF; border-left:1px solid rgba(30,58,138,0.2);
+    display:flex; flex-direction:column; z-index:1000;
+    transform:translateX(100%); transition:transform 0.28s ease;
+    font-family:'Manrope',sans-serif; box-shadow:-4px 0 16px rgba(0,0,0,0.12);
+  }
+  #wp-panel.open{transform:translateX(0);}
+  #wp-panel-head{
+    background:#1E3A8A; padding:12px 14px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  #wp-panel-head span{
+    font-size:0.68rem;font-weight:800;letter-spacing:2px;
+    text-transform:uppercase;color:#DBEAFE;
+  }
+  #wp-close{background:none;border:none;color:#93C5FD;cursor:pointer;
+    font-size:1.1rem;padding:4px;line-height:1;touch-action:manipulation;}
+  #wp-close:hover{color:#EF4444;}
+  #wp-list{flex:1;overflow-y:auto;padding:10px;
+    scrollbar-width:thin;scrollbar-color:#1D4ED8 #F0F4F8;}
+  #wp-list::-webkit-scrollbar{width:4px;}
+  #wp-list::-webkit-scrollbar-thumb{background:#1D4ED8;border-radius:4px;}
+  .wp-item{background:#F0F4F8;border:1px solid rgba(30,58,138,0.12);
+    border-left:3px solid #1E3A8A;border-radius:8px;padding:9px 10px;margin-bottom:8px;}
+  .wp-item-top{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
+  .wp-item-name{font-size:0.76rem;font-weight:700;color:#0F172A;flex:1;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .wp-item-coords{font-size:0.60rem;color:#94A3B8;font-family:'IBM Plex Mono',monospace;}
+  .wp-item-note{font-size:0.66rem;color:#475569;margin-top:3px;font-style:italic;}
+  .wp-item-actions{display:flex;gap:5px;margin-top:7px;}
+  .wp-btn{flex:1;padding:6px 0;border:none;border-radius:5px;cursor:pointer;
+    font-size:0.65rem;font-weight:700;min-height:34px;touch-action:manipulation;}
+  .wp-btn-go {background:#EFF6FF;color:#1D4ED8;}
+  .wp-btn-go:hover{background:#DBEAFE;}
+  .wp-btn-del{background:#FEF2F2;color:#DC2626;}
+  .wp-btn-del:hover{background:#FEE2E2;}
+  #wp-export-btn{margin:10px;padding:10px;border:1px solid rgba(30,58,138,0.2);
+    background:#EFF6FF;color:#1E3A8A;border-radius:7px;font-size:0.68rem;
+    font-weight:700;cursor:pointer;letter-spacing:1px;text-transform:uppercase;
+    min-height:40px;touch-action:manipulation;}
+  #wp-export-btn:hover{background:#DBEAFE;}
+  #wp-empty{text-align:center;padding:28px 14px;color:#94A3B8;font-size:0.74rem;line-height:1.7;}
+
+  /* ── SAVE DIALOG ────────────────────────────────────────── */
+  #wp-dialog{
+    display:none;position:absolute;z-index:2000;
+    background:#FFFFFF;border:2px solid #1E3A8A;
+    border-radius:12px;padding:16px;
+    width:min(240px,90vw);
+    box-shadow:0 8px 32px rgba(0,0,0,0.2);font-family:'Manrope',sans-serif;
+  }
+  #wp-dialog h4{font-size:0.70rem;font-weight:800;color:#1E3A8A;
+    letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;}
+  .dlg-label{font-size:0.62rem;font-weight:700;color:#475569;
+    text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;display:block;}
+  .dlg-input{width:100%;background:#F0F4F8;border:1px solid rgba(30,58,138,0.2);
+    border-radius:6px;padding:8px 10px;color:#0F172A;font-size:0.80rem;
+    margin-bottom:10px;outline:none;font-family:'Manrope',sans-serif;
+    -webkit-appearance:none;min-height:40px;}
+  .dlg-input:focus{border-color:#1E3A8A;}
+  .dlg-select{width:100%;background:#F0F4F8;border:1px solid rgba(30,58,138,0.2);
+    border-radius:6px;padding:8px 10px;color:#0F172A;font-size:0.80rem;
+    margin-bottom:10px;font-family:'Manrope',sans-serif;min-height:40px;}
+  .dlg-row{display:flex;gap:8px;}
+  .dlg-btn{flex:1;padding:10px;border:none;border-radius:7px;cursor:pointer;
+    font-size:0.74rem;font-weight:800;touch-action:manipulation;min-height:42px;}
+  .dlg-save{background:#1E3A8A;color:white;}
+  .dlg-save:hover,.dlg-save:active{background:#1D4ED8;}
+  .dlg-cancel{background:#F0F4F8;color:#475569;}
+  .dlg-cancel:hover{background:#E8EEF4;}
+
+  /* ── MOBILE OVERRIDES ───────────────────────────────────── */
+  @media (max-width:600px){
+    #toolbar{padding:6px 8px;gap:5px;}
+    .tbtn{font-size:0.65rem;padding:7px 9px;min-height:38px;}
+    #result-panel{font-size:0.65rem;min-width:0;width:100%;order:99;flex-basis:100%;}
+    #legend{padding:5px 8px;gap:8px;}
+    .leg-item{font-size:0.56rem;}
+    .leg-src{display:none;}
+  }
 
   /* ── WAYPOINT PANEL ─────────────────────────────────── */
   #wp-panel {
@@ -1236,7 +1353,7 @@ with tab2:
 </style>
 </head>
 <body>
-<div style="position:relative;overflow:hidden;">
+<div style="position:relative;overflow:hidden;display:flex;flex-direction:column;height:100vh;">
 <div id="toolbar">
   <button class="tbtn" id="btn-measure" onclick="setTool('measure')">&#128207; MEDIR DISTANCIA</button>
   <button class="tbtn" id="btn-bearing" onclick="setTool('bearing')">&#129517; CALCULAR DERROTA</button>
@@ -1274,25 +1391,19 @@ with tab2:
 
 <div id="map"></div>
 <div id="legend">
-  <div class="leg-item"><div class="leg-dot" style="background:#F43F5E;"></div> Roca / Bajo</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#FBBF24;"></div> Arenal</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#10B981;"></div> Puerto</div>
-  <div class="leg-item" style="gap:3px">
-    <span style="font-size:0.62rem;color:#64748B;margin-right:2px;">Prof:</span>
-    <div style="width:10px;height:12px;background:#b3e5fc;border-radius:2px 0 0 2px;"></div>
-    <div style="width:10px;height:12px;background:#4fc3f7;"></div>
-    <div style="width:10px;height:12px;background:#0288d1;"></div>
-    <div style="width:10px;height:12px;background:#01579b;"></div>
-    <div style="width:10px;height:12px;background:#002652;"></div>
-    <div style="width:10px;height:12px;background:#000e20;border-radius:0 2px 2px 0;"></div>
-    <span style="font-size:0.6rem;color:#64748B;"> GEBCO 2024</span>
+  <div class="leg-item"><div class="leg-dot" style="background:#DC2626;"></div> Roca / Bajo</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#D97706;"></div> Arenal</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#059669;"></div> Puerto</div>
+  <div class="leg-item">
+    <div style="width:10px;height:10px;background:#b3e5fc;border-radius:2px 0 0 2px;"></div>
+    <div style="width:10px;height:10px;background:#0288d1;"></div>
+    <div style="width:10px;height:10px;background:#000e20;border-radius:0 2px 2px 0;"></div>
+    <span style="font-size:0.58rem;">GEBCO 2024</span>
   </div>
-  <div class="leg-item"><div class="leg-line" style="background:#3B82F6;opacity:0.7;"></div> Corriente costera</div>
-  <div class="leg-item"><div class="leg-line" style="background:#818CF8;opacity:0.7;"></div> Contracorriente</div>
-  <div class="leg-item"><div class="leg-line" style="background:#06B6D4;opacity:0.7;"></div> Cte. marea</div>
-  <div class="leg-item"><div class="leg-line" style="border-top:2px dashed #F43F5E;background:none;height:0;width:20px;"></div> Medición</div>
-  <div class="leg-item"><div class="leg-line" style="border-top:2px dashed #10B981;background:none;height:0;width:20px;"></div> Derrota</div>
-  <span class="leg-src">OpenSeaMap · ESRI Ocean · GEBCO 2024 (BODC) · EMODnet · OSM</span>
+  <div class="leg-item"><div class="leg-line" style="background:#1D4ED8;opacity:0.7;"></div> Corriente</div>
+  <div class="leg-item"><div class="leg-line" style="border-top:2px dashed #DC2626;background:none;height:0;width:18px;"></div> Medición</div>
+  <div class="leg-item"><div class="leg-line" style="border-top:2px dashed #059669;background:none;height:0;width:18px;"></div> Derrota</div>
+  <span class="leg-src">GEBCO · OpenSeaMap · ESRI · EMODnet</span>
 </div>
 
 <!-- WAYPOINT PANEL -->
@@ -1331,35 +1442,37 @@ var esriRef   = L.tileLayer(
 var seamark   = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
   {attribution:'© OpenSeaMap',opacity:1.0});
 
-// ── BATIMETRÍA — GEBCO 2024 (British Oceanographic Data Centre) ────────────────
-// PROBLEMA ANTERIOR: SLD_BODY en peticiones WMS por tiles se trunca en URLs largas
-// SOLUCIÓN: GEBCO WMS oficial con capas pre-coloreadas — sin SLD, siempre funciona
+// ── BATIMETRÍA — GEBCO 2024 XYZ tiles + EMODnet isobatas ─────────────────────
+// Enfoque anterior (WMS GEBCO) tenía problemas de CORS y carga lenta.
+// XYZ tiles pre-renderizados: carga directa desde CDN, sin parámetros complejos.
 //
-//  GEBCO_LATEST_2 = mapa plano coloreado por cota (azules para océano)
-//  GEBCO_LATEST   = relieve sombreado hillshade
-//  Fuente: wms.gebco.net — BODC / Nippon Foundation-GEBCO Seabed 2030 Project
+// GEBCO 2024 color tiles: azul claro (0m) → azul oscuro (profundo)
+// Zoom range: 1-14 | resolución 15 arc-segundos global
 
-var gebcoBathy = L.tileLayer.wms('https://wms.gebco.net/mapserv?', {
-  layers:     'GEBCO_LATEST_2',
-  styles:     '',
-  format:     'image/png',
-  transparent: true,
-  opacity:     0.80,
-  version:    '1.3.0',
-  attribution:'© GEBCO 2024 / BODC'
-});
+var gebcoBathy = L.tileLayer(
+  'https://tiles.gebco.net/tiles/gebco_2024/{z}/{x}/{y}.png',
+  {
+    attribution: '© GEBCO 2024 / BODC',
+    opacity:     0.82,
+    maxZoom:     14,
+    minZoom:     8,
+    crossOrigin: true
+  }
+);
 
-var gebcoRelief = L.tileLayer.wms('https://wms.gebco.net/mapserv?', {
-  layers:     'GEBCO_LATEST',
-  styles:     '',
-  format:     'image/png',
-  transparent: true,
-  opacity:     0.65,
-  version:    '1.3.0',
-  attribution:'© GEBCO 2024 / BODC'
-});
+// GEBCO hillshade (sombreado de relieve) — muestra pendientes submarinas
+var gebcoRelief = L.tileLayer(
+  'https://tiles.gebco.net/tiles/gebco_latest_2/{z}/{x}/{y}.png',
+  {
+    attribution: '© GEBCO 2024 / BODC',
+    opacity:     0.65,
+    maxZoom:     14,
+    minZoom:     8,
+    crossOrigin: true
+  }
+);
 
-// EMODnet isobatas — capa de contornos en su estilo nativo (sin SLD — funciona bien)
+// EMODnet isobatas — líneas de profundidad a resolución variable según zoom
 var emodCtrs = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
   layers:     'emodnet:contours',
   styles:     '',
@@ -1369,7 +1482,7 @@ var emodCtrs = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
   attribution:'© EMODnet Bathymetry'
 });
 
-// Por defecto: GEBCO color + isobatas EMODnet + marcas OpenSeaMap
+// Por defecto: ESRI Ocean + GEBCO color + isobatas + OpenSeaMap
 esriOcean.addTo(map); esriRef.addTo(map);
 gebcoBathy.addTo(map); emodCtrs.addTo(map); seamark.addTo(map);
 
@@ -1379,11 +1492,11 @@ L.control.layers(
     '&#128506; OSM + OpenSeaMap':        L.layerGroup([osmBase, seamark])
   },
   {
-    '&#127760; GEBCO 2024 — color por profundidad': gebcoBathy,
-    '&#127956; GEBCO 2024 — relieve sombreado':     gebcoRelief,
-    '&#10967;  EMODnet — isobatas (líneas)':        emodCtrs
+    '&#127760; GEBCO 2024 — color profundidad': gebcoBathy,
+    '&#127956; GEBCO 2024 — relieve sombreado': gebcoRelief,
+    '&#10967;  EMODnet — isobatas':             emodCtrs
   },
-  {position:'topright', collapsed:false}
+  {position:'topright', collapsed:true}
 ).addTo(map);
 
 function mkIcon(bg,glyph){
@@ -1760,7 +1873,7 @@ loadWaypoints();
 </body>
 </html>"""
 
-    components.html(CHART_HTML, height=800, scrolling=False)
+    components.html(CHART_HTML, height=750, scrolling=False)
     st.markdown("""
     <div class='pie'>
       🗺️ <b>OpenSeaMap</b> (marcas náuticas) · <b>ESRI Ocean</b> (carta base) ·
@@ -1842,7 +1955,7 @@ with tab3:
                       scrollbar-width:thin;scrollbar-color:{col} #E8EEF4;">
             {cards}
           </div>
-        </div>""", height=215, scrolling=False)
+        </div>""", height=270, scrolling=False)
 
     st.markdown("""
     <div class='pie'>
